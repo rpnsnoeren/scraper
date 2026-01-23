@@ -8,23 +8,55 @@ export function normalizeUrl(url: string): string {
 }
 
 export function getCareerPageCandidates(domain: string): string[] {
-  const base = normalizeUrl(domain);
+  // Clean domain (remove protocol, www, trailing slash)
+  const cleanDomain = domain
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/\/$/, '');
+
+  const base = `https://${cleanDomain}`;
+  const baseName = cleanDomain.split('.')[0]; // e.g., "coolblue" from "coolblue.nl"
+
   const paths = [
+    '/vacatures',
     '/careers',
     '/jobs',
-    '/vacatures',
     '/werken-bij',
     '/werkenbij',
-    '/over-ons/vacatures',
-    '/nl/careers',
+    '/werk',
+    '/jobs/all',
+    '/careers/jobs',
     '/nl/vacatures',
+    '/nl/careers',
     '/en/careers',
+    '/over-ons/vacatures',
     '/join-us',
     '/join',
     '/team',
+    '/open-positions',
+    '/job-openings',
   ];
 
-  return paths.map(path => `${base}${path}`);
+  // Generate candidates: paths on main domain + subdomains
+  const candidates: string[] = [];
+
+  // Main domain paths
+  paths.forEach(path => candidates.push(`${base}${path}`));
+
+  // Common career subdomains
+  const subdomains = [
+    `https://werkenbij${cleanDomain}`,
+    `https://jobs.${cleanDomain}`,
+    `https://careers.${cleanDomain}`,
+    `https://werken.${cleanDomain}`,
+    `https://werkenbij.${cleanDomain}`,
+    `https://www.werkenbij${baseName}.nl`,
+    `https://werkenbij${baseName}.nl`,
+  ];
+
+  subdomains.forEach(sub => candidates.push(sub));
+
+  return [...new Set(candidates)];
 }
 
 export function extractDomain(url: string): string {

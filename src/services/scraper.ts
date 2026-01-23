@@ -4,16 +4,23 @@ export class ScraperService {
   private browser: Browser | null = null;
 
   needsJavaScript(html: string): boolean {
+    // Very short pages likely need JS
+    if (html.length < 1000) return true;
+
     const spaIndicators = [
       /<div id="(root|app|__next)">\s*<\/div>/i,
       /loading\.\.\./i,
       /<noscript>.*enable javascript/i,
+      /glimlach/i, // Coolblue loading page
+      /<body[^>]*>\s*<\/body>/i, // Empty body
     ];
 
-    const hasContent = /<(h1|h2|h3|p|li|article)[^>]*>[^<]{20,}/i.test(html);
+    // Check if there's actual meaningful content
+    const textContent = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const hasContent = textContent.length > 500;
     const hasSpaIndicator = spaIndicators.some(pattern => pattern.test(html));
 
-    return hasSpaIndicator && !hasContent;
+    return hasSpaIndicator || !hasContent;
   }
 
   extractCareerLinks(html: string, baseUrl: string): string[] {
@@ -60,16 +67,34 @@ export class ScraperService {
     }
   }
 
-  async fetchWithPlaywright(url: string, timeout = 30000): Promise<string> {
+  async fetchWithPlaywright(url: string, timeout = 45000): Promise<string> {
     if (!this.browser) {
       this.browser = await chromium.launch({ headless: true });
     }
 
     const page = await this.browser.newPage();
 
+    // Set a realistic viewport and user agent
+    await page.setViewportSize({ width: 1920, height: 1080 });
+
     try {
       await page.goto(url, { waitUntil: 'networkidle', timeout });
+
+      // Wait for content to load
+      await page.waitForTimeout(3000);
+
+      // Scroll to load lazy content
+      await page.evaluate(async () => {
+        for (let i = 0; i < 3; i++) {
+          window.scrollBy(0, window.innerHeight);
+          await new Promise(r => setTimeout(r, 500));
+        }
+        window.scrollTo(0, 0);
+      });
+
+      // Wait a bit more after scrolling
       await page.waitForTimeout(2000);
+
       return await page.content();
     } finally {
       await page.close();

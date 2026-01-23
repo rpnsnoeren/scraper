@@ -40,36 +40,39 @@ export class AIExtractor {
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-      .slice(0, 50000);
+      .slice(0, 80000);
   }
 
   buildPrompt(html: string, url: string): string {
     const cleanedHtml = this.cleanHtml(html);
     const domain = new URL(url).hostname;
 
-    return `Analyseer de volgende tekst van een career/vacature pagina van ${domain} en extraheer alle vacatures.
+    return `Je bent een expert in het extraheren van vacatures van career pagina's. Analyseer de tekst van ${domain} en vind ALLE vacatures.
 
-Voor elke vacature, extraheer:
-- title: functietitel
-- url: link naar de vacature (relatief of absoluut)
+BELANGRIJK:
+- Zoek naar ALLE vacatures/jobs die je kunt vinden, niet alleen de eerste paar
+- Elke unieke functietitel is een vacature
+- Let op lijsten, kaarten, of herhalende patronen die vacatures aangeven
+
+Voor elke vacature, extraheer (gebruik null als niet beschikbaar):
+- title: functietitel (VERPLICHT)
+- url: link naar de vacature (kan relatief zijn zoals "/jobs/123")
 - location: locatie (stad, land, of "Remote")
-- description: korte beschrijving (max 500 tekens)
-- salary_min/salary_max/salary_currency/salary_period: salaris info indien beschikbaar
+- description: korte beschrijving (max 300 tekens)
+- salary_min/salary_max/salary_currency/salary_period: salaris info
 - type: "fulltime", "parttime", "contract", of "internship"
-- skills: lijst van gevraagde skills/technologieën
+- skills: array van gevraagde skills (bijv. ["Python", "React"])
 - seniority: "junior", "medior", "senior", of "lead"
-- department: afdeling (bijv. "Engineering", "Marketing")
-- published_date: publicatiedatum in ISO format indien zichtbaar
+- department: afdeling
+- published_date: datum in ISO format (YYYY-MM-DD)
 
-Geef je antwoord als JSON met dit formaat:
+Antwoord ALLEEN met valid JSON:
 {
-  "vacancies": [...],
-  "confidence": 0.0-1.0 (hoe zeker je bent over de extractie)
+  "vacancies": [{"title": "...", ...}],
+  "confidence": 0.0-1.0
 }
 
-Als er geen vacatures zijn, geef een lege array.
-
-Tekst van de pagina:
+Tekst:
 ${cleanedHtml}`;
   }
 
@@ -78,7 +81,7 @@ ${cleanedHtml}`;
 
     const response = await this.client.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [{ role: 'user', content: prompt }],
     });
 
