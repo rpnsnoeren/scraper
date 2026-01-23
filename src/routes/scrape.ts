@@ -5,10 +5,10 @@ import { ScrapeRequestSchema } from '../types/vacancy';
 import { ZodError } from 'zod';
 
 export async function scrapeRoutes(fastify: FastifyInstance, orchestrator: Orchestrator) {
-  // Simple API key auth (skip for health check)
+  // Simple API key auth (only for /api/* routes)
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
-    // Skip auth for health check
-    if (request.url === '/health') {
+    // Only check auth for API routes
+    if (!request.url.startsWith('/api/')) {
       return;
     }
 
