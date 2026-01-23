@@ -1,7 +1,9 @@
 // src/index.ts
 import 'dotenv/config';
+import path from 'path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fastifyStatic from '@fastify/static';
 import { Orchestrator } from './services/orchestrator';
 import { scrapeRoutes } from './routes/scrape';
 
@@ -12,6 +14,12 @@ async function main() {
 
   await fastify.register(cors, {
     origin: true,
+  });
+
+  // Serve static files (frontend)
+  await fastify.register(fastifyStatic, {
+    root: path.join(process.cwd(), 'public'),
+    prefix: '/',
   });
 
   // Validate required env vars
