@@ -5,8 +5,13 @@ import { ScrapeRequestSchema } from '../types/vacancy';
 import { ZodError } from 'zod';
 
 export async function scrapeRoutes(fastify: FastifyInstance, orchestrator: Orchestrator) {
-  // Simple API key auth
+  // Simple API key auth (skip for health check)
   fastify.addHook('preHandler', async (request: FastifyRequest, reply: FastifyReply) => {
+    // Skip auth for health check
+    if (request.url === '/health') {
+      return;
+    }
+
     const apiKey = request.headers['authorization']?.replace('Bearer ', '');
     const expectedKey = process.env.API_KEY;
 
