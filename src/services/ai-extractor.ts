@@ -80,7 +80,7 @@ ${cleanedHtml}`;
     const prompt = this.buildPrompt(html, url);
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 8192,
       messages: [{ role: 'user', content: prompt }],
     });
