@@ -18,8 +18,12 @@ export class CacheService {
 
   async get<T>(key: string): Promise<T | null> {
     if (this.redis) {
-      const data = await this.redis.get(key);
-      return data ? JSON.parse(data) : null;
+      try {
+        const data = await this.redis.get(key);
+        return data ? JSON.parse(data) : null;
+      } catch {
+        return null;
+      }
     }
 
     const cached = this.memoryCache.get(key);
@@ -34,13 +38,17 @@ export class CacheService {
     const expiry = ttl ?? this.ttl;
 
     if (this.redis) {
-      await this.redis.setex(key, expiry, JSON.stringify(data));
-    } else {
-      this.memoryCache.set(key, {
-        data,
-        expires: Date.now() + expiry * 1000,
-      });
+      try {
+        await this.redis.setex(key, expiry, JSON.stringify(data));
+        return;
+      } catch {
+        // Fall through to memory cache on Redis error
+      }
     }
+    this.memoryCache.set(key, {
+      data,
+      expires: Date.now() + expiry * 1000,
+    });
   }
 
   async close(): Promise<void> {
