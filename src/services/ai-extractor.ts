@@ -5,9 +5,9 @@ import { z } from 'zod';
 
 const AIVacancySchema = z.object({
   title: z.string(),
-  url: z.string().optional(),
-  location: z.string().nullable(),
-  description: z.string(),
+  url: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  description: z.string().default(''),
   salary_min: z.number().nullable(),
   salary_max: z.number().nullable(),
   salary_currency: z.string().nullable(),
