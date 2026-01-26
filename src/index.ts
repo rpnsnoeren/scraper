@@ -35,6 +35,11 @@ async function main() {
   // Register routes
   await scrapeRoutes(fastify, orchestrator);
 
+  // Serve docs page
+  fastify.get('/docs', async (request, reply) => {
+    return reply.sendFile('docs.html');
+  });
+
   // Graceful shutdown
   const shutdown = async () => {
     fastify.log.info('Shutting down...');

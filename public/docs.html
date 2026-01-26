@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vacancy Scraper - API Documentation</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+      color: #f8fafc;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      margin: 2rem 0 1rem;
+      color: #f8fafc;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.125rem;
+      margin: 1.5rem 0 0.75rem;
+      color: #e2e8f0;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 2rem;
+    }
+
+    .version {
+      display: inline-block;
+      background: #334155;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .info-box {
+      background: #1e3a5f;
+      border-left: 4px solid #3b82f6;
+      padding: 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 1rem;
+      color: #93c5fd;
+    }
+
+    .warning-box {
+      background: #422006;
+      border-left: 4px solid #f59e0b;
+      padding: 1rem;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 1rem;
+      color: #fcd34d;
+    }
+
+    code {
+      background: #0f172a;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.875rem;
+      color: #fbbf24;
+    }
+
+    pre {
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      position: relative;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .code-block {
+      position: relative;
+      margin: 1rem 0;
+    }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.75rem;
+      background: #334155;
+      color: #e2e8f0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    .copy-btn:hover {
+      background: #475569;
+    }
+
+    .copy-btn.copied {
+      background: #14532d;
+      color: #4ade80;
+    }
+
+    /* Endpoint styling */
+    .endpoint {
+      background: #1e293b;
+      border-radius: 12px;
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    .endpoint-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .endpoint-header:hover {
+      background: #334155;
+    }
+
+    .method {
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-transform: uppercase;
+    }
+
+    .method.post {
+      background: #14532d;
+      color: #4ade80;
+    }
+
+    .method.get {
+      background: #1e3a5f;
+      color: #60a5fa;
+    }
+
+    .endpoint-path {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 1rem;
+      color: #f8fafc;
+    }
+
+    .endpoint-desc {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-left: auto;
+    }
+
+    .endpoint-body {
+      display: none;
+      padding: 1.5rem;
+      border-top: 1px solid #334155;
+    }
+
+    .endpoint.open .endpoint-body {
+      display: block;
+    }
+
+    .expand-icon {
+      color: #64748b;
+      transition: transform 0.2s;
+    }
+
+    .endpoint.open .expand-icon {
+      transform: rotate(180deg);
+    }
+
+    /* Table styling */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.875rem;
+    }
+
+    th, td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+
+    th {
+      background: #0f172a;
+      color: #94a3b8;
+      font-weight: 500;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+    }
+
+    td {
+      color: #e2e8f0;
+    }
+
+    td code {
+      font-size: 0.8rem;
+    }
+
+    .required {
+      color: #f87171;
+      font-size: 0.75rem;
+    }
+
+    .optional {
+      color: #94a3b8;
+      font-size: 0.75rem;
+    }
+
+    /* Try it out section */
+    .try-it-out {
+      background: #0f172a;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    .try-it-out h4 {
+      color: #f8fafc;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-group label {
+      display: block;
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-bottom: 0.5rem;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      max-width: 400px;
+      padding: 0.75rem 1rem;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #f8fafc;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus {
+      border-color: #3b82f6;
+    }
+
+    input::placeholder {
+      color: #64748b;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #2563eb;
+    }
+
+    button:disabled {
+      background: #475569;
+      cursor: not-allowed;
+    }
+
+    .response-area {
+      margin-top: 1rem;
+    }
+
+    .response-area pre {
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-right: 0.5rem;
+    }
+
+    .status-200 { background: #14532d; color: #4ade80; }
+    .status-400 { background: #7c2d12; color: #fb923c; }
+    .status-401 { background: #7c2d12; color: #fb923c; }
+    .status-500 { background: #450a0a; color: #f87171; }
+
+    /* Syntax highlighting */
+    .json-key { color: #93c5fd; }
+    .json-string { color: #86efac; }
+    .json-number { color: #fbbf24; }
+    .json-boolean { color: #c4b5fd; }
+    .json-null { color: #94a3b8; }
+    .curl-command { color: #fbbf24; }
+    .curl-flag { color: #93c5fd; }
+    .curl-url { color: #86efac; }
+
+    /* Navigation */
+    nav {
+      background: #1e293b;
+      padding: 1rem 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+
+    nav a {
+      color: #60a5fa;
+      text-decoration: none;
+      margin-right: 1.5rem;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    /* Schema section */
+    .schema-section {
+      margin-top: 1rem;
+    }
+
+    .schema-toggle {
+      background: none;
+      border: 1px solid #334155;
+      color: #60a5fa;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+    }
+
+    .schema-toggle:hover {
+      background: #334155;
+    }
+
+    .schema-content {
+      display: none;
+    }
+
+    .schema-content.show {
+      display: block;
+    }
+
+    .nested-table {
+      margin-left: 1rem;
+      border-left: 2px solid #334155;
+      padding-left: 1rem;
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid #334155;
+      text-align: center;
+      color: #64748b;
+    }
+
+    footer a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Vacancy Scraper API <span class="version">v1.0</span></h1>
+    <p class="subtitle">Scrape vacatures van elke bedrijfswebsite met AI-powered extractie</p>
+
+    <nav>
+      <a href="#authentication">Authenticatie</a>
+      <a href="#endpoints">Endpoints</a>
+      <a href="#errors">Error Codes</a>
+      <a href="#schemas">Schemas</a>
+      <a href="/">API Tester</a>
+    </nav>
+
+    <!-- Authentication Section -->
+    <section id="authentication">
+      <h2>Authenticatie</h2>
+      <div class="card">
+        <p>Alle API requests naar <code>/api/*</code> endpoints vereisen authenticatie via een Bearer token in de Authorization header.</p>
+
+        <div class="info-box">
+          Vervang <code>YOUR_API_KEY</code> in de voorbeelden met jouw API sleutel.
+        </div>
+
+        <h3>Header Formaat</h3>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+          <pre>Authorization: Bearer YOUR_API_KEY</pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Base URL Section -->
+    <section id="base-url">
+      <h2>Base URL</h2>
+      <div class="card">
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+          <pre id="baseUrl"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Endpoints Section -->
+    <section id="endpoints">
+      <h2>Endpoints</h2>
+
+      <!-- POST /api/scrape -->
+      <div class="endpoint open" id="endpoint-scrape">
+        <div class="endpoint-header" onclick="toggleEndpoint('endpoint-scrape')">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/scrape</span>
+          <span class="endpoint-desc">Scrape vacatures van een domein</span>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p>Scrape vacatures van een bedrijfswebsite. De API detecteert automatisch de career pagina en gebruikt platform-specifieke parsers of AI-extractie.</p>
+
+          <h3>Request Parameters</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>domain</code> <span class="required">*required</span></td>
+                <td><code>string</code></td>
+                <td>Het domein om te scrapen (bijv. "coolblue.nl")</td>
+              </tr>
+              <tr>
+                <td><code>detailLimit</code> <span class="optional">optional</span></td>
+                <td><code>number</code></td>
+                <td>Aantal vacatures om in detail te scrapen (0-20, default: 0)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Request Body</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"domain"</span>: <span class="json-string">"example.nl"</span>,
+  <span class="json-key">"detailLimit"</span>: <span class="json-number">5</span>
+}</code></pre>
+          </div>
+
+          <h3>cURL Command</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre id="curlExample"><code></code></pre>
+          </div>
+
+          <h3>Response (200 OK)</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"domain"</span>: <span class="json-string">"example.nl"</span>,
+  <span class="json-key">"hasVacancies"</span>: <span class="json-boolean">true</span>,
+  <span class="json-key">"vacancyCount"</span>: <span class="json-number">3</span>,
+  <span class="json-key">"vacancies"</span>: [
+    {
+      <span class="json-key">"id"</span>: <span class="json-string">"abc123..."</span>,
+      <span class="json-key">"title"</span>: <span class="json-string">"Senior Developer"</span>,
+      <span class="json-key">"url"</span>: <span class="json-string">"https://example.nl/careers/dev"</span>,
+      <span class="json-key">"location"</span>: <span class="json-string">"Amsterdam"</span>,
+      <span class="json-key">"description"</span>: <span class="json-string">"We zoeken een ervaren developer..."</span>,
+      <span class="json-key">"salary"</span>: {
+        <span class="json-key">"min"</span>: <span class="json-number">3000</span>,
+        <span class="json-key">"max"</span>: <span class="json-number">4500</span>,
+        <span class="json-key">"currency"</span>: <span class="json-string">"EUR"</span>,
+        <span class="json-key">"period"</span>: <span class="json-string">"month"</span>
+      },
+      <span class="json-key">"type"</span>: <span class="json-string">"fulltime"</span>,
+      <span class="json-key">"seniority"</span>: <span class="json-string">"senior"</span>,
+      <span class="json-key">"department"</span>: <span class="json-string">"Engineering"</span>,
+      <span class="json-key">"skills"</span>: [<span class="json-string">"TypeScript"</span>, <span class="json-string">"React"</span>],
+      <span class="json-key">"publishedAt"</span>: <span class="json-string">"2026-01-23T00:00:00Z"</span>,
+      <span class="json-key">"daysOpen"</span>: <span class="json-number">3</span>,
+      <span class="json-key">"scrapedAt"</span>: <span class="json-string">"2026-01-26T14:00:00Z"</span>,
+      <span class="json-key">"confidence"</span>: <span class="json-number">0.85</span>,
+      <span class="json-key">"hasDetails"</span>: <span class="json-boolean">true</span>,
+      <span class="json-key">"fullDescription"</span>: <span class="json-string">"Volledige vacaturetekst..."</span>,
+      <span class="json-key">"requirements"</span>: [<span class="json-string">"5+ jaar ervaring"</span>],
+      <span class="json-key">"responsibilities"</span>: [<span class="json-string">"Leiden van projecten"</span>],
+      <span class="json-key">"benefits"</span>: [<span class="json-string">"25 vakantiedagen"</span>],
+      <span class="json-key">"remotePolicy"</span>: <span class="json-string">"hybrid"</span>
+    }
+  ],
+  <span class="json-key">"source"</span>: {
+    <span class="json-key">"platform"</span>: <span class="json-string">"recruitee"</span>,
+    <span class="json-key">"careerPageUrl"</span>: <span class="json-string">"https://example.nl/careers"</span>,
+    <span class="json-key">"method"</span>: <span class="json-string">"parser"</span>
+  },
+  <span class="json-key">"cached"</span>: <span class="json-boolean">false</span>,
+  <span class="json-key">"scrapedAt"</span>: <span class="json-string">"2026-01-26T14:00:00Z"</span>
+}</code></pre>
+          </div>
+
+          <!-- Try It Out -->
+          <div class="try-it-out">
+            <h4>Try It Out</h4>
+            <div class="form-group">
+              <label for="tryDomain">Domain</label>
+              <input type="text" id="tryDomain" placeholder="example.nl" value="example.nl">
+            </div>
+            <div class="form-group">
+              <label for="tryDetailLimit">Detail Limit (0-20)</label>
+              <input type="number" id="tryDetailLimit" placeholder="0" value="0" min="0" max="20">
+            </div>
+            <button id="executeBtn" onclick="executeRequest()">Execute Request</button>
+
+            <div class="response-area" id="responseArea" style="display: none;">
+              <h4>Response <span id="responseStatus" class="status-badge"></span></h4>
+              <div class="code-block">
+                <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+                <pre id="responseBody"><code></code></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- GET /health -->
+      <div class="endpoint" id="endpoint-health">
+        <div class="endpoint-header" onclick="toggleEndpoint('endpoint-health')">
+          <span class="method get">GET</span>
+          <span class="endpoint-path">/health</span>
+          <span class="endpoint-desc">Health check endpoint</span>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p>Controleer of de API beschikbaar is. Dit endpoint vereist geen authenticatie.</p>
+
+          <h3>cURL Command</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre id="curlHealth"><code></code></pre>
+          </div>
+
+          <h3>Response (200 OK)</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"status"</span>: <span class="json-string">"ok"</span>
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Error Codes Section -->
+    <section id="errors">
+      <h2>Error Codes</h2>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Code</th>
+              <th>Beschrijving</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="status-badge status-200">200</span></td>
+              <td>OK</td>
+              <td>Request succesvol verwerkt</td>
+            </tr>
+            <tr>
+              <td><span class="status-badge status-400">400</span></td>
+              <td>Bad Request</td>
+              <td>Ongeldige request body of parameters (bijv. ongeldig domein formaat)</td>
+            </tr>
+            <tr>
+              <td><span class="status-badge status-401">401</span></td>
+              <td>Unauthorized</td>
+              <td>Ontbrekende of ongeldige API key</td>
+            </tr>
+            <tr>
+              <td><span class="status-badge status-500">500</span></td>
+              <td>Server Error</td>
+              <td>Scraping mislukt (website onbereikbaar, parsing error, etc.)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Error Response Formaat</h3>
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+          <pre><code>{
+  <span class="json-key">"error"</span>: <span class="json-string">"Invalid request"</span>,
+  <span class="json-key">"details"</span>: [
+    {
+      <span class="json-key">"code"</span>: <span class="json-string">"custom"</span>,
+      <span class="json-key">"message"</span>: <span class="json-string">"Invalid domain format"</span>,
+      <span class="json-key">"path"</span>: [<span class="json-string">"domain"</span>]
+    }
+  ]
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Schemas Section -->
+    <section id="schemas">
+      <h2>Response Schemas</h2>
+
+      <div class="card">
+        <h3>Vacancy Object</h3>
+        <p>Elk vacancy object bevat de volgende velden:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Veld</th>
+              <th>Type</th>
+              <th>Beschrijving</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>id</code></td>
+              <td><code>string</code></td>
+              <td>Unieke identifier (hash van URL)</td>
+            </tr>
+            <tr>
+              <td><code>title</code></td>
+              <td><code>string</code></td>
+              <td>Vacaturetitel</td>
+            </tr>
+            <tr>
+              <td><code>url</code></td>
+              <td><code>string</code></td>
+              <td>Directe link naar de vacature</td>
+            </tr>
+            <tr>
+              <td><code>location</code></td>
+              <td><code>string | null</code></td>
+              <td>Werklocatie</td>
+            </tr>
+            <tr>
+              <td><code>description</code></td>
+              <td><code>string</code></td>
+              <td>Korte beschrijving van de vacature</td>
+            </tr>
+            <tr>
+              <td><code>salary</code></td>
+              <td><code>Salary | null</code></td>
+              <td>Salarisinformatie (zie Salary object)</td>
+            </tr>
+            <tr>
+              <td><code>type</code></td>
+              <td><code>string | null</code></td>
+              <td>fulltime | parttime | contract | internship</td>
+            </tr>
+            <tr>
+              <td><code>skills</code></td>
+              <td><code>string[]</code></td>
+              <td>Lijst van vereiste skills</td>
+            </tr>
+            <tr>
+              <td><code>seniority</code></td>
+              <td><code>string | null</code></td>
+              <td>junior | medior | senior | lead</td>
+            </tr>
+            <tr>
+              <td><code>department</code></td>
+              <td><code>string | null</code></td>
+              <td>Afdeling (bijv. "Engineering", "Sales")</td>
+            </tr>
+            <tr>
+              <td><code>publishedAt</code></td>
+              <td><code>string | null</code></td>
+              <td>Publicatiedatum (ISO 8601)</td>
+            </tr>
+            <tr>
+              <td><code>daysOpen</code></td>
+              <td><code>number | null</code></td>
+              <td>Aantal dagen dat de vacature open is</td>
+            </tr>
+            <tr>
+              <td><code>scrapedAt</code></td>
+              <td><code>string</code></td>
+              <td>Timestamp van scraping (ISO 8601)</td>
+            </tr>
+            <tr>
+              <td><code>confidence</code></td>
+              <td><code>number</code></td>
+              <td>AI confidence score (0-1)</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Detail Velden (bij detailLimit &gt; 0)</h3>
+        <p>Wanneer <code>detailLimit</code> groter is dan 0, worden de eerste N vacatures in detail gescraped:</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Veld</th>
+              <th>Type</th>
+              <th>Beschrijving</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>hasDetails</code></td>
+              <td><code>boolean</code></td>
+              <td>True als details zijn opgehaald</td>
+            </tr>
+            <tr>
+              <td><code>fullDescription</code></td>
+              <td><code>string | null</code></td>
+              <td>Volledige vacaturetekst</td>
+            </tr>
+            <tr>
+              <td><code>requirements</code></td>
+              <td><code>string[]</code></td>
+              <td>Lijst van vereisten</td>
+            </tr>
+            <tr>
+              <td><code>responsibilities</code></td>
+              <td><code>string[]</code></td>
+              <td>Lijst van verantwoordelijkheden</td>
+            </tr>
+            <tr>
+              <td><code>benefits</code></td>
+              <td><code>string[]</code></td>
+              <td>Arbeidsvoorwaarden</td>
+            </tr>
+            <tr>
+              <td><code>education</code></td>
+              <td><code>string | null</code></td>
+              <td>Vereiste opleiding</td>
+            </tr>
+            <tr>
+              <td><code>experience</code></td>
+              <td><code>string | null</code></td>
+              <td>Vereiste ervaring</td>
+            </tr>
+            <tr>
+              <td><code>workHours</code></td>
+              <td><code>string | null</code></td>
+              <td>Werkuren per week</td>
+            </tr>
+            <tr>
+              <td><code>remotePolicy</code></td>
+              <td><code>string | null</code></td>
+              <td>onsite | hybrid | remote</td>
+            </tr>
+            <tr>
+              <td><code>applicationDeadline</code></td>
+              <td><code>string | null</code></td>
+              <td>Sollicitatie deadline</td>
+            </tr>
+            <tr>
+              <td><code>contactPerson</code></td>
+              <td><code>string | null</code></td>
+              <td>Contactpersoon</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Salary Object</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Veld</th>
+              <th>Type</th>
+              <th>Beschrijving</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>min</code></td>
+              <td><code>number | null</code></td>
+              <td>Minimum salaris</td>
+            </tr>
+            <tr>
+              <td><code>max</code></td>
+              <td><code>number | null</code></td>
+              <td>Maximum salaris</td>
+            </tr>
+            <tr>
+              <td><code>currency</code></td>
+              <td><code>string | null</code></td>
+              <td>Valuta (bijv. "EUR")</td>
+            </tr>
+            <tr>
+              <td><code>period</code></td>
+              <td><code>string | null</code></td>
+              <td>year | month | hour</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Source Object</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Veld</th>
+              <th>Type</th>
+              <th>Beschrijving</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>platform</code></td>
+              <td><code>string | null</code></td>
+              <td>Gedetecteerd platform (recruitee, greenhouse, lever, workable) of null</td>
+            </tr>
+            <tr>
+              <td><code>careerPageUrl</code></td>
+              <td><code>string</code></td>
+              <td>URL van de gevonden career pagina</td>
+            </tr>
+            <tr>
+              <td><code>method</code></td>
+              <td><code>string</code></td>
+              <td>parser (platform-specifiek) of ai (Claude extractie)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <p>
+        <a href="/">Terug naar API Tester</a>
+      </p>
+    </footer>
+  </div>
+
+  <script>
+    const API_URL = window.location.origin;
+
+    // Set base URL
+    document.getElementById('baseUrl').textContent = API_URL;
+
+    // Set curl examples
+    document.getElementById('curlExample').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-flag">-X POST</span> <span class="curl-url">"${API_URL}/api/scrape"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Authorization: Bearer YOUR_API_KEY"</span> \\
+  <span class="curl-flag">-d</span> <span class="json-string">'{"domain": "example.nl", "detailLimit": 5}'</span></code>`;
+
+    document.getElementById('curlHealth').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-url">"${API_URL}/health"</span></code>`;
+
+    // Toggle endpoint sections
+    function toggleEndpoint(id) {
+      const endpoint = document.getElementById(id);
+      endpoint.classList.toggle('open');
+    }
+
+    // Copy code to clipboard
+    async function copyCode(btn) {
+      const pre = btn.parentElement.querySelector('pre');
+      const text = pre.textContent;
+
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Gekopieerd!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Kopieer';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Copy failed:', err);
+      }
+    }
+
+    // Execute API request
+    async function executeRequest() {
+      const domain = document.getElementById('tryDomain').value.trim();
+      const detailLimit = parseInt(document.getElementById('tryDetailLimit').value) || 0;
+      const btn = document.getElementById('executeBtn');
+      const responseArea = document.getElementById('responseArea');
+      const responseStatus = document.getElementById('responseStatus');
+      const responseBody = document.getElementById('responseBody');
+
+      if (!domain) {
+        alert('Voer een domein in');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Loading...';
+      responseArea.style.display = 'block';
+      responseStatus.textContent = 'Loading...';
+      responseStatus.className = 'status-badge';
+      responseBody.innerHTML = '<code>Bezig met request...</code>';
+
+      try {
+        const body = { domain };
+        if (detailLimit > 0) body.detailLimit = detailLimit;
+
+        const response = await fetch(`${API_URL}/api/scrape`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer YOUR_API_KEY'
+          },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        responseStatus.textContent = response.status;
+        responseStatus.className = `status-badge status-${response.status}`;
+        responseBody.innerHTML = `<code>${syntaxHighlight(JSON.stringify(data, null, 2))}</code>`;
+      } catch (error) {
+        responseStatus.textContent = 'Error';
+        responseStatus.className = 'status-badge status-500';
+        responseBody.innerHTML = `<code>${error.message}</code>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Execute Request';
+      }
+    }
+
+    // JSON syntax highlighting
+    function syntaxHighlight(json) {
+      return json
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?)/g, (match) => {
+          if (/:$/.test(match)) {
+            return `<span class="json-key">${match}</span>`;
+          }
+          return `<span class="json-string">${match}</span>`;
+        })
+        .replace(/\b(true|false)\b/g, '<span class="json-boolean">$1</span>')
+        .replace(/\bnull\b/g, '<span class="json-null">null</span>')
+        .replace(/\b(-?\d+\.?\d*)\b/g, '<span class="json-number">$1</span>');
+    }
+  </script>
+</body>
+</html>
