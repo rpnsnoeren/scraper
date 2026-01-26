@@ -17,6 +17,21 @@ export function getCareerPageCandidates(domain: string): string[] {
   const base = `https://${cleanDomain}`;
   const baseName = cleanDomain.split('.')[0]; // e.g., "coolblue" from "coolblue.nl"
 
+  // Generate candidates - prioritize dedicated career sites over paths
+  const candidates: string[] = [];
+
+  // 1. First check dedicated career subdomains (usually most complete)
+  const subdomains = [
+    `https://www.werkenbij${baseName}.nl`,
+    `https://werkenbij${baseName}.nl`,
+    `https://careers.${cleanDomain}`,
+    `https://jobs.${cleanDomain}`,
+    `https://werkenbij.${cleanDomain}`,
+    `https://werken.${cleanDomain}`,
+  ];
+  subdomains.forEach(sub => candidates.push(sub));
+
+  // 2. Then check paths on main domain
   const paths = [
     '/vacatures',
     '/careers',
@@ -36,25 +51,7 @@ export function getCareerPageCandidates(domain: string): string[] {
     '/open-positions',
     '/job-openings',
   ];
-
-  // Generate candidates: paths on main domain + subdomains
-  const candidates: string[] = [];
-
-  // Main domain paths
   paths.forEach(path => candidates.push(`${base}${path}`));
-
-  // Common career subdomains
-  const subdomains = [
-    `https://werkenbij${cleanDomain}`,
-    `https://jobs.${cleanDomain}`,
-    `https://careers.${cleanDomain}`,
-    `https://werken.${cleanDomain}`,
-    `https://werkenbij.${cleanDomain}`,
-    `https://www.werkenbij${baseName}.nl`,
-    `https://werkenbij${baseName}.nl`,
-  ];
-
-  subdomains.forEach(sub => candidates.push(sub));
 
   return [...new Set(candidates)];
 }

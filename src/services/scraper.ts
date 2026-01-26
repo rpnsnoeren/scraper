@@ -69,13 +69,37 @@ export class ScraperService {
 
   async fetchWithPlaywright(url: string, timeout = 45000): Promise<string> {
     if (!this.browser) {
-      this.browser = await chromium.launch({ headless: true });
+      this.browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+        ],
+      });
     }
 
-    const page = await this.browser.newPage();
+    const context = await this.browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'nl-NL',
+      timezoneId: 'Europe/Amsterdam',
+    });
 
-    // Set a realistic viewport and user agent
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    const page = await context.newPage();
+
+    // Remove webdriver property to avoid detection
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      // @ts-ignore
+      window.chrome = { runtime: {} };
+    });
 
     try {
       await page.goto(url, { waitUntil: 'networkidle', timeout });
@@ -97,7 +121,7 @@ export class ScraperService {
 
       return await page.content();
     } finally {
-      await page.close();
+      await context.close();
     }
   }
 

@@ -105,6 +105,21 @@
       width: 200px;
     }
 
+    .api-key-group select {
+      padding: 0.5rem 0.75rem;
+      border: 2px solid #334155;
+      border-radius: 6px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .api-key-group select:focus {
+      border-color: #3b82f6;
+      outline: none;
+    }
+
     .status {
       display: flex;
       align-items: center;
@@ -236,14 +251,72 @@
       text-decoration: underline;
     }
 
+    .vacancy.has-details {
+      border-left-color: #10b981;
+    }
+
+    .detail-badge {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      background: #10b981;
+      color: white;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    .full-desc {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+      padding: 0.75rem;
+      background: #1e293b;
+      border-radius: 6px;
+    }
+
+    .detail-section {
+      margin-bottom: 1rem;
+    }
+
+    .detail-section strong {
+      color: #e2e8f0;
+      font-size: 0.875rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .detail-section ul {
+      margin: 0;
+      padding-left: 1.25rem;
+      color: #94a3b8;
+      font-size: 0.875rem;
+    }
+
+    .detail-section li {
+      margin-bottom: 0.25rem;
+    }
+
+    .salary-info {
+      margin: 0.75rem 0;
+      padding: 0.5rem 0.75rem;
+      background: #1e3a5f;
+      border-radius: 6px;
+      color: #60a5fa;
+      font-weight: 500;
+      font-size: 0.875rem;
+      display: inline-block;
+    }
+
     .no-vacancies {
       text-align: center;
       padding: 2rem;
       color: #94a3b8;
     }
 
-    .json-toggle {
+    .toggle-btn {
       margin-top: 1rem;
+      margin-right: 1rem;
       font-size: 0.875rem;
       color: #60a5fa;
       cursor: pointer;
@@ -252,46 +325,231 @@
       padding: 0;
     }
 
-    .json-toggle:hover {
+    .toggle-btn:hover {
       text-decoration: underline;
     }
 
-    .json-output {
+    .output-box {
       display: none;
       margin-top: 1rem;
       background: #0f172a;
       border-radius: 8px;
       padding: 1rem;
       overflow-x: auto;
+      position: relative;
     }
 
-    .json-output.show {
+    .output-box.show {
       display: block;
     }
 
-    .json-output pre {
+    .output-box pre {
       color: #94a3b8;
       font-family: 'Monaco', 'Menlo', monospace;
       font-size: 0.75rem;
       white-space: pre-wrap;
       word-break: break-all;
     }
+
+    .copy-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+      background: #334155;
+      color: #e2e8f0;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .copy-btn:hover {
+      background: #475569;
+    }
+
+    .copy-btn.copied {
+      background: #14532d;
+      color: #4ade80;
+    }
+
+    .curl-box {
+      margin-bottom: 1rem;
+    }
+
+    .curl-box pre {
+      color: #fbbf24;
+    }
+
+    /* Scraper selector tabs */
+    .scraper-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .scraper-tab {
+      padding: 0.75rem 1.25rem;
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 8px;
+      color: #94a3b8;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .scraper-tab:hover {
+      border-color: #475569;
+      color: #e2e8f0;
+    }
+
+    .scraper-tab.active {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      color: white;
+    }
+
+    .scraper-tab.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .scraper-tab .icon {
+      font-size: 1.25rem;
+    }
+
+    .scraper-tab .badge {
+      font-size: 0.65rem;
+      padding: 0.15rem 0.4rem;
+      background: #475569;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .scraper-tab.active .badge {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .scraper-description {
+      color: #64748b;
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: #1e293b;
+      border-radius: 8px;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .scraper-panel {
+      display: none;
+    }
+
+    .scraper-panel.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Vacancy Scraper</h1>
-    <p class="subtitle">Test de API door een domeinnaam in te voeren</p>
+    <h1>Scraper Platform</h1>
+    <p class="subtitle">Kies een scraper en voer een domeinnaam in</p>
 
-    <div class="card">
-      <div class="api-key-group">
-        <label for="apiKey">API Key:</label>
-        <input type="text" id="apiKey" value="test123" placeholder="Je API key">
+    <!-- Scraper Type Selector -->
+    <div class="scraper-tabs">
+      <button class="scraper-tab active" data-scraper="vacancy" onclick="selectScraper('vacancy')">
+        <span class="icon">💼</span>
+        <span>Vacatures</span>
+      </button>
+      <button class="scraper-tab disabled" data-scraper="company" onclick="selectScraper('company')">
+        <span class="icon">🏢</span>
+        <span>Bedrijfsinfo</span>
+        <span class="badge">Binnenkort</span>
+      </button>
+      <button class="scraper-tab disabled" data-scraper="contacts" onclick="selectScraper('contacts')">
+        <span class="icon">👥</span>
+        <span>Contacten</span>
+        <span class="badge">Binnenkort</span>
+      </button>
+      <button class="scraper-tab disabled" data-scraper="tech" onclick="selectScraper('tech')">
+        <span class="icon">⚙️</span>
+        <span>Tech Stack</span>
+        <span class="badge">Binnenkort</span>
+      </button>
+    </div>
+
+    <!-- Vacancy Scraper Panel -->
+    <div id="panel-vacancy" class="scraper-panel active">
+      <div class="scraper-description">
+        Scrape vacatures van een bedrijfswebsite. Vindt automatisch de career pagina en extraheert vacature details met AI.
       </div>
 
-      <div class="form-group">
-        <input type="text" id="domain" placeholder="bijv. coolblue.nl" autofocus>
-        <button id="scrapeBtn" onclick="scrape()">Scrape</button>
+      <div class="card">
+        <div class="api-key-group">
+          <label for="apiKey">API Key:</label>
+          <input type="text" id="apiKey" value="test123" placeholder="Je API key">
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="domain" placeholder="bijv. coolblue.nl" autofocus>
+          <button id="scrapeBtn" onclick="scrape()">Scrape</button>
+        </div>
+
+        <div class="api-key-group">
+          <label for="detailLimit">Detail scraping:</label>
+          <select id="detailLimit" onchange="updateCurlPreview()">
+            <option value="0">Uit - alleen overzicht</option>
+            <option value="3">3 vacatures in detail</option>
+            <option value="5">5 vacatures in detail</option>
+            <option value="10">10 vacatures in detail</option>
+            <option value="20">20 vacatures in detail (max)</option>
+          </select>
+        </div>
+
+        <div id="curlSection" class="curl-box output-box">
+          <button class="copy-btn" onclick="copyCurl()">Kopieer</button>
+          <pre id="curlCommand"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Company Info Scraper Panel (Coming Soon) -->
+    <div id="panel-company" class="scraper-panel">
+      <div class="scraper-description">
+        Scrape bedrijfsinformatie zoals beschrijving, grootte, industrie, locaties en social media links.
+      </div>
+      <div class="card">
+        <div class="no-vacancies">
+          <p>🚧 Deze scraper is nog in ontwikkeling</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contacts Scraper Panel (Coming Soon) -->
+    <div id="panel-contacts" class="scraper-panel">
+      <div class="scraper-description">
+        Vind contactgegevens en beslissers binnen een organisatie voor sales en recruitment doeleinden.
+      </div>
+      <div class="card">
+        <div class="no-vacancies">
+          <p>🚧 Deze scraper is nog in ontwikkeling</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tech Stack Scraper Panel (Coming Soon) -->
+    <div id="panel-tech" class="scraper-panel">
+      <div class="scraper-description">
+        Detecteer welke technologieën een website gebruikt: frameworks, analytics, CMS, hosting en meer.
+      </div>
+      <div class="card">
+        <div class="no-vacancies">
+          <p>🚧 Deze scraper is nog in ontwikkeling</p>
+        </div>
       </div>
     </div>
 
@@ -301,8 +559,14 @@
       <div class="card">
         <div class="meta" id="meta"></div>
         <div id="vacancies"></div>
-        <button class="json-toggle" onclick="toggleJson()">Toon raw JSON</button>
-        <div id="jsonOutput" class="json-output">
+        <button class="toggle-btn" onclick="toggleCurl()">Toon cURL command</button>
+        <button class="toggle-btn" onclick="toggleJson()">Toon raw JSON</button>
+        <div id="curlOutput" class="output-box curl-box">
+          <button class="copy-btn" onclick="copyResultCurl()">Kopieer</button>
+          <pre id="curlPre"></pre>
+        </div>
+        <div id="jsonOutput" class="output-box">
+          <button class="copy-btn" onclick="copyJson()">Kopieer</button>
           <pre id="jsonPre"></pre>
         </div>
       </div>
@@ -310,11 +574,90 @@
   </div>
 
   <script>
-    const API_URL = 'http://localhost:3000';
+    const API_URL = window.location.origin;
+    let lastDomain = '';
+    let lastApiKey = '';
+    let currentScraper = 'vacancy';
+
+    // Scraper configurations
+    const scrapers = {
+      vacancy: {
+        endpoint: '/api/scrape',
+        name: 'Vacatures',
+        enabled: true
+      },
+      company: {
+        endpoint: '/api/company',
+        name: 'Bedrijfsinfo',
+        enabled: false
+      },
+      contacts: {
+        endpoint: '/api/contacts',
+        name: 'Contacten',
+        enabled: false
+      },
+      tech: {
+        endpoint: '/api/tech-stack',
+        name: 'Tech Stack',
+        enabled: false
+      }
+    };
+
+    function selectScraper(type) {
+      const scraper = scrapers[type];
+      if (!scraper || !scraper.enabled) return;
+
+      // Update tabs
+      document.querySelectorAll('.scraper-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelector(`[data-scraper="${type}"]`).classList.add('active');
+
+      // Update panels
+      document.querySelectorAll('.scraper-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      document.getElementById(`panel-${type}`).classList.add('active');
+
+      // Hide results when switching
+      document.getElementById('results').classList.remove('show');
+      document.getElementById('status').style.display = 'none';
+
+      currentScraper = type;
+      updateCurlPreview();
+    }
 
     document.getElementById('domain').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') scrape();
     });
+
+    // Update curl preview when inputs change
+    document.getElementById('domain').addEventListener('input', updateCurlPreview);
+    document.getElementById('apiKey').addEventListener('input', updateCurlPreview);
+
+    function generateCurlCommand(domain, apiKey, detailLimit) {
+      const endpoint = scrapers[currentScraper]?.endpoint || '/api/scrape';
+      const body = detailLimit > 0
+        ? `{"domain": "${domain}", "detailLimit": ${detailLimit}}`
+        : `{"domain": "${domain}"}`;
+      return `curl -X POST "${API_URL}${endpoint}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '${body}'`;
+    }
+
+    function updateCurlPreview() {
+      const domain = document.getElementById('domain').value.trim() || 'voorbeeld.nl';
+      const apiKey = document.getElementById('apiKey').value.trim() || 'YOUR_API_KEY';
+      const detailLimitEl = document.getElementById('detailLimit');
+      const detailLimit = detailLimitEl ? parseInt(detailLimitEl.value) : 0;
+      const curl = generateCurlCommand(domain, apiKey, detailLimit);
+      document.getElementById('curlCommand').textContent = curl;
+      document.getElementById('curlSection').classList.add('show');
+    }
+
+    // Show curl preview on load
+    updateCurlPreview();
 
     async function scrape() {
       const domain = document.getElementById('domain').value.trim();
@@ -325,21 +668,34 @@
         return;
       }
 
+      lastDomain = domain;
+      lastApiKey = apiKey;
+
+      const detailLimitEl = document.getElementById('detailLimit');
+      const detailLimit = detailLimitEl ? parseInt(detailLimitEl.value) : 0;
+
       const btn = document.getElementById('scrapeBtn');
       btn.disabled = true;
       btn.textContent = 'Scraping...';
 
-      showStatus('Bezig met scrapen... Dit kan even duren.', 'loading');
+      const statusMsg = detailLimit > 0
+        ? `Bezig met scrapen + ${detailLimit} detail pagina's... Dit kan even duren.`
+        : 'Bezig met scrapen... Dit kan even duren.';
+      showStatus(statusMsg, 'loading');
       document.getElementById('results').classList.remove('show');
 
       try {
-        const response = await fetch(`${API_URL}/api/scrape`, {
+        const endpoint = scrapers[currentScraper]?.endpoint || '/api/scrape';
+        const body = { domain };
+        if (detailLimit > 0) body.detailLimit = detailLimit;
+
+        const response = await fetch(`${API_URL}${endpoint}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify({ domain })
+          body: JSON.stringify(body)
         });
 
         const data = await response.json();
@@ -408,19 +764,44 @@
         `;
       } else {
         vacanciesEl.innerHTML = data.vacancies.map(v => `
-          <div class="vacancy">
-            <h3>${v.title}</h3>
+          <div class="vacancy ${v.hasDetails ? 'has-details' : ''}">
+            <h3>${v.title} ${v.hasDetails ? '<span class="detail-badge">Gedetailleerd</span>' : ''}</h3>
             <div class="vacancy-meta">
               ${v.location ? `<span>📍 ${v.location}</span>` : ''}
               ${v.type ? `<span>💼 ${v.type}</span>` : ''}
               ${v.seniority ? `<span>📊 ${v.seniority}</span>` : ''}
               ${v.department ? `<span>🏢 ${v.department}</span>` : ''}
+              ${v.remotePolicy ? `<span>🏠 ${v.remotePolicy}</span>` : ''}
               ${v.daysOpen !== null ? `<span>📅 ${v.daysOpen} dagen open</span>` : ''}
             </div>
             ${v.description ? `<p>${v.description}</p>` : ''}
+            ${v.fullDescription ? `<p class="full-desc">${v.fullDescription.substring(0, 500)}${v.fullDescription.length > 500 ? '...' : ''}</p>` : ''}
+            ${v.requirements && v.requirements.length > 0 ? `
+              <div class="detail-section">
+                <strong>Vereisten:</strong>
+                <ul>${v.requirements.map(r => `<li>${r}</li>`).join('')}</ul>
+              </div>
+            ` : ''}
+            ${v.responsibilities && v.responsibilities.length > 0 ? `
+              <div class="detail-section">
+                <strong>Verantwoordelijkheden:</strong>
+                <ul>${v.responsibilities.map(r => `<li>${r}</li>`).join('')}</ul>
+              </div>
+            ` : ''}
+            ${v.benefits && v.benefits.length > 0 ? `
+              <div class="detail-section">
+                <strong>Arbeidsvoorwaarden:</strong>
+                <ul>${v.benefits.map(b => `<li>${b}</li>`).join('')}</ul>
+              </div>
+            ` : ''}
             ${v.skills && v.skills.length > 0 ? `
               <div class="skills">
                 ${v.skills.map(s => `<span class="skill">${s}</span>`).join('')}
+              </div>
+            ` : ''}
+            ${v.salary ? `
+              <div class="salary-info">
+                💰 ${v.salary.min ? v.salary.min.toLocaleString() : '?'} - ${v.salary.max ? v.salary.max.toLocaleString() : '?'} ${v.salary.currency || 'EUR'} / ${v.salary.period || 'jaar'}
               </div>
             ` : ''}
             <a href="${v.url}" target="_blank" class="vacancy-link">Bekijk vacature →</a>
@@ -430,10 +811,48 @@
 
       // JSON output
       document.getElementById('jsonPre').textContent = JSON.stringify(data, null, 2);
+
+      // Curl output
+      const detailLimitEl = document.getElementById('detailLimit');
+      const detailLimit = detailLimitEl ? parseInt(detailLimitEl.value) : 0;
+      document.getElementById('curlPre').textContent = generateCurlCommand(lastDomain, lastApiKey, detailLimit);
     }
 
     function toggleJson() {
       document.getElementById('jsonOutput').classList.toggle('show');
+    }
+
+    function toggleCurl() {
+      document.getElementById('curlOutput').classList.toggle('show');
+    }
+
+    async function copyToClipboard(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Gekopieerd!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Kopieer';
+          btn.classList.remove('copied');
+        }, 2000);
+      } catch (err) {
+        console.error('Kopiëren mislukt:', err);
+      }
+    }
+
+    function copyCurl() {
+      const curl = document.getElementById('curlCommand').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    function copyResultCurl() {
+      const curl = document.getElementById('curlPre').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    function copyJson() {
+      const json = document.getElementById('jsonPre').textContent;
+      copyToClipboard(json, event.target);
     }
   </script>
 </body>

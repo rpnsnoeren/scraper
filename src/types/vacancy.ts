@@ -23,6 +23,18 @@ export const VacancySchema = z.object({
   daysOpen: z.number().nullable(),
   scrapedAt: z.string(),
   confidence: z.number().min(0).max(1),
+  // Detail fields (only populated when detail scraping is enabled)
+  hasDetails: z.boolean().optional(),
+  fullDescription: z.string().nullable().optional(),
+  requirements: z.array(z.string()).optional(),
+  responsibilities: z.array(z.string()).optional(),
+  benefits: z.array(z.string()).optional(),
+  education: z.string().nullable().optional(),
+  experience: z.string().nullable().optional(),
+  workHours: z.string().nullable().optional(),
+  applicationDeadline: z.string().nullable().optional(),
+  contactPerson: z.string().nullable().optional(),
+  remotePolicy: z.enum(['onsite', 'hybrid', 'remote']).nullable().optional(),
 });
 
 export const ScrapeResponseSchema = z.object({
@@ -48,6 +60,7 @@ export const ScrapeRequestSchema = z.object({
     (val) => /^[a-zA-Z0-9][a-zA-Z0-9-_.]+\.[a-zA-Z]{2,}$/.test(val),
     { message: 'Invalid domain format' }
   ),
+  detailLimit: z.number().min(0).max(20).optional().default(0),
 });
 
 export type ScrapeRequest = z.infer<typeof ScrapeRequestSchema>;

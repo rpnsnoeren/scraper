@@ -23,7 +23,7 @@ export async function scrapeRoutes(fastify: FastifyInstance, orchestrator: Orche
   fastify.post('/api/scrape', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = ScrapeRequestSchema.parse(request.body);
-      const result = await orchestrator.scrape(body.domain);
+      const result = await orchestrator.scrape(body.domain, body.detailLimit);
       return result;
     } catch (error) {
       if (error instanceof ZodError) {
