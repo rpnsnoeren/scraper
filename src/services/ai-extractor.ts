@@ -13,7 +13,7 @@ const AIVacancySchema = z.object({
   title: z.string(),
   url: z.string().nullable().optional(),
   location: stringOrArray,
-  description: z.string().optional().default(''),
+  description: z.string().nullable().optional().transform(v => v ?? ''),
   salary_min: z.number().nullable().optional(),
   salary_max: z.number().nullable().optional(),
   salary_currency: z.string().nullable().optional(),
