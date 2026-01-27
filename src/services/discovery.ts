@@ -132,7 +132,8 @@ export class DiscoveryService {
 
       for (const url of sortedUrls.slice(0, 5)) {
         try {
-          const { html } = await this.scraper.fetch(url);
+          const { html, status } = await this.scraper.fetch(url);
+          if (status >= 400) continue; // Skip error pages (404, 500, etc.)
           if (this.looksLikeCareerPage(html)) {
             const platform = this.detectPlatform(url) || this.detectPlatformFromHtml(html);
             // Pass along other sitemap URLs for the AI to consider
@@ -151,14 +152,15 @@ export class DiscoveryService {
       const batch = candidates.slice(i, i + 3);
       const results = await Promise.allSettled(
         batch.map(async (url) => {
-          const { html } = await this.scraper.fetch(url);
-          return { url, html };
+          const { html, status } = await this.scraper.fetch(url);
+          return { url, html, status };
         })
       );
 
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          const { url, html } = result.value;
+          const { url, html, status } = result.value;
+          if (status >= 400) continue; // Skip error pages (404, 500, etc.)
           if (this.looksLikeCareerPage(html)) {
             const platform = this.detectPlatform(url) || this.detectPlatformFromHtml(html);
             return { url, html, platform, additionalUrls: sitemapUrls.slice(0, 50) };
@@ -168,18 +170,21 @@ export class DiscoveryService {
     }
 
     try {
-      const { html } = await this.scraper.fetch(normalizeUrl(domain));
-      const careerLinks = this.scraper.extractCareerLinks(html, normalizeUrl(domain));
+      const { html, status: homeStatus } = await this.scraper.fetch(normalizeUrl(domain));
+      if (homeStatus < 400) {
+        const careerLinks = this.scraper.extractCareerLinks(html, normalizeUrl(domain));
 
-      for (const link of careerLinks.slice(0, 3)) {
-        try {
-          const { html: careerHtml } = await this.scraper.fetch(link);
-          if (this.looksLikeCareerPage(careerHtml)) {
-            const platform = this.detectPlatform(link) || this.detectPlatformFromHtml(careerHtml);
-            return { url: link, html: careerHtml, platform, additionalUrls: sitemapUrls.slice(0, 50) };
+        for (const link of careerLinks.slice(0, 3)) {
+          try {
+            const { html: careerHtml, status: linkStatus } = await this.scraper.fetch(link);
+            if (linkStatus >= 400) continue; // Skip error pages
+            if (this.looksLikeCareerPage(careerHtml)) {
+              const platform = this.detectPlatform(link) || this.detectPlatformFromHtml(careerHtml);
+              return { url: link, html: careerHtml, platform, additionalUrls: sitemapUrls.slice(0, 50) };
+            }
+          } catch {
+            continue;
           }
-        } catch {
-          continue;
         }
       }
     } catch {

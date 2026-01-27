@@ -67,7 +67,7 @@ export class ScraperService {
     }
   }
 
-  async fetchWithPlaywright(url: string, timeout = 45000): Promise<string> {
+  async fetchWithPlaywright(url: string, timeout = 45000): Promise<{ html: string; status: number }> {
     if (!this.browser) {
       this.browser = await chromium.launch({
         headless: true,
@@ -102,7 +102,8 @@ export class ScraperService {
     });
 
     try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout });
+      const response = await page.goto(url, { waitUntil: 'networkidle', timeout });
+      const status = response?.status() ?? 0;
 
       // Wait for content to load
       await page.waitForTimeout(3000);
@@ -119,25 +120,26 @@ export class ScraperService {
       // Wait a bit more after scrolling
       await page.waitForTimeout(2000);
 
-      return await page.content();
+      const html = await page.content();
+      return { html, status };
     } finally {
       await context.close();
     }
   }
 
-  async fetch(url: string): Promise<{ html: string; usedPlaywright: boolean }> {
+  async fetch(url: string): Promise<{ html: string; usedPlaywright: boolean; status: number }> {
     try {
       const { html, status } = await this.fetchWithHttp(url);
 
       if (status === 200 && !this.needsJavaScript(html)) {
-        return { html, usedPlaywright: false };
+        return { html, usedPlaywright: false, status };
       }
     } catch {
       // HTTP failed, try Playwright
     }
 
-    const html = await this.fetchWithPlaywright(url);
-    return { html, usedPlaywright: true };
+    const { html, status } = await this.fetchWithPlaywright(url);
+    return { html, usedPlaywright: true, status };
   }
 
   async close(): Promise<void> {
