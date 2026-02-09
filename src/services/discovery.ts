@@ -74,7 +74,61 @@ export class DiscoveryService {
     });
   }
 
-  private parseSitemapXml(xml: string): string[] {
+  async fetchAllSitemapUrls(domain: string): Promise<string[]> {
+    const baseUrl = normalizeUrl(domain);
+    const sitemapUrls = [
+      `${baseUrl}/sitemap.xml`,
+      `${baseUrl}/sitemap_index.xml`,
+      `${baseUrl}/sitemap-index.xml`,
+      `${baseUrl}/sitemaps.xml`,
+    ];
+
+    const allUrls: string[] = [];
+
+    for (const sitemapUrl of sitemapUrls) {
+      try {
+        const response = await fetch(sitemapUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChatSyncBot/1.0)' },
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (!response.ok) continue;
+
+        const xml = await response.text();
+        const urls = this.parseSitemapXml(xml);
+
+        // Check if this is a sitemap index (contains other sitemaps)
+        const nestedSitemaps = urls.filter(u => u.endsWith('.xml'));
+        if (nestedSitemaps.length > 0) {
+          for (const nestedUrl of nestedSitemaps.slice(0, 10)) {
+            try {
+              const nestedResponse = await fetch(nestedUrl, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ChatSyncBot/1.0)' },
+                signal: AbortSignal.timeout(10000),
+              });
+              if (nestedResponse.ok) {
+                const nestedXml = await nestedResponse.text();
+                allUrls.push(...this.parseSitemapXml(nestedXml));
+              }
+            } catch {
+              continue;
+            }
+          }
+        }
+
+        // Add non-sitemap URLs
+        allUrls.push(...urls.filter(u => !u.endsWith('.xml')));
+
+        if (allUrls.length > 0) break;
+      } catch {
+        continue;
+      }
+    }
+
+    return [...new Set(allUrls)];
+  }
+
+  parseSitemapXml(xml: string): string[] {
     const urls: string[] = [];
     // Match <loc>...</loc> tags
     const locRegex = /<loc>([^<]+)<\/loc>/gi;

@@ -6,10 +6,15 @@ import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
 import { Orchestrator } from './services/orchestrator';
 import { scrapeRoutes } from './routes/scrape';
+import { chatsyncRoutes } from './routes/chatsync';
+import { ChatSyncOrchestrator } from './services/chatsync-orchestrator';
+import { CacheService } from './services/cache';
+import { ScraperService } from './services/scraper';
+import { DiscoveryService } from './services/discovery';
 
 async function main() {
   const fastify = Fastify({
-    logger: true,
+    logger: false,
   });
 
   await fastify.register(cors, {
@@ -32,8 +37,15 @@ async function main() {
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
   });
 
+  // ChatSync dependencies
+  const cache = new CacheService(process.env.REDIS_URL);
+  const scraper = new ScraperService();
+  const discovery = new DiscoveryService(scraper);
+  const chatsyncOrchestrator = new ChatSyncOrchestrator(cache, scraper, discovery);
+
   // Register routes
   await scrapeRoutes(fastify, orchestrator);
+  await chatsyncRoutes(fastify, chatsyncOrchestrator);
 
   // Serve docs page
   fastify.get('/docs', async (request, reply) => {
@@ -42,8 +54,10 @@ async function main() {
 
   // Graceful shutdown
   const shutdown = async () => {
-    fastify.log.info('Shutting down...');
+    console.log('Shutting down...');
     await orchestrator.close();
+    await cache.close();
+    await scraper.close();
     await fastify.close();
     process.exit(0);
   };
@@ -56,9 +70,9 @@ async function main() {
 
   try {
     await fastify.listen({ port, host: '0.0.0.0' });
-    fastify.log.info(`Server running on port ${port}`);
+    console.log(`Server running on http://localhost:${port}`);
   } catch (err) {
-    fastify.log.error(err);
+    console.error('Failed to start server:', err);
     process.exit(1);
   }
 }

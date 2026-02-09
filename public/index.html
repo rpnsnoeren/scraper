@@ -465,6 +465,10 @@
         <span class="icon">💼</span>
         <span>Vacatures</span>
       </button>
+      <button class="scraper-tab" data-scraper="chatsync" onclick="selectScraper('chatsync')">
+        <span class="icon">💬</span>
+        <span>ChatSync</span>
+      </button>
       <button class="scraper-tab disabled" data-scraper="company" onclick="selectScraper('company')">
         <span class="icon">🏢</span>
         <span>Bedrijfsinfo</span>
@@ -513,6 +517,40 @@
         <div id="curlSection" class="curl-box output-box">
           <button class="copy-btn" onclick="copyCurl()">Kopieer</button>
           <pre id="curlCommand"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ChatSync Scraper Panel -->
+    <div id="panel-chatsync" class="scraper-panel">
+      <div class="scraper-description">
+        Scrape een hele website voor ChatSync. Haalt content op, converteert naar markdown en levert een gestructureerde knowledge base voor je chatbot.
+      </div>
+
+      <div class="card">
+        <div class="api-key-group">
+          <label for="csApiKey">API Key:</label>
+          <input type="text" id="csApiKey" value="test123" placeholder="Je API key">
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="csDomain" placeholder="bijv. example.com">
+          <button id="csScrapeBtn" onclick="chatsyncScrape()">Scrape</button>
+        </div>
+
+        <div class="api-key-group">
+          <label for="csMaxPages">Max pagina's:</label>
+          <select id="csMaxPages" onchange="updateChatsyncCurl()">
+            <option value="10">10 pagina's</option>
+            <option value="20" selected>20 pagina's</option>
+            <option value="30">30 pagina's</option>
+            <option value="50">50 pagina's (max)</option>
+          </select>
+        </div>
+
+        <div id="csCurlSection" class="curl-box output-box">
+          <button class="copy-btn" onclick="copyCsCurl()">Kopieer</button>
+          <pre id="csCurlCommand"></pre>
         </div>
       </div>
     </div>
@@ -584,6 +622,11 @@
       vacancy: {
         endpoint: '/api/scrape',
         name: 'Vacatures',
+        enabled: true
+      },
+      chatsync: {
+        endpoint: '/api/chatsync',
+        name: 'ChatSync',
         enabled: true
       },
       company: {
@@ -854,6 +897,148 @@
       const json = document.getElementById('jsonPre').textContent;
       copyToClipboard(json, event.target);
     }
+
+    // === ChatSync Functions ===
+
+    document.getElementById('csDomain').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') chatsyncScrape();
+    });
+    document.getElementById('csDomain').addEventListener('input', updateChatsyncCurl);
+    document.getElementById('csApiKey').addEventListener('input', updateChatsyncCurl);
+
+    function generateChatsyncCurl(domain, apiKey, maxPages) {
+      const body = maxPages !== 20
+        ? `{"domain": "${domain}", "maxPages": ${maxPages}}`
+        : `{"domain": "${domain}"}`;
+      return `curl -X POST "${API_URL}/api/chatsync" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '${body}'`;
+    }
+
+    function updateChatsyncCurl() {
+      const domain = document.getElementById('csDomain').value.trim() || 'voorbeeld.nl';
+      const apiKey = document.getElementById('csApiKey').value.trim() || 'YOUR_API_KEY';
+      const maxPages = parseInt(document.getElementById('csMaxPages').value);
+      const curl = generateChatsyncCurl(domain, apiKey, maxPages);
+      document.getElementById('csCurlCommand').textContent = curl;
+      document.getElementById('csCurlSection').classList.add('show');
+    }
+
+    function copyCsCurl() {
+      const curl = document.getElementById('csCurlCommand').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    async function chatsyncScrape() {
+      const domain = document.getElementById('csDomain').value.trim();
+      const apiKey = document.getElementById('csApiKey').value.trim();
+      const maxPages = parseInt(document.getElementById('csMaxPages').value);
+
+      if (!domain) {
+        showStatus('Voer een domeinnaam in', 'error');
+        return;
+      }
+
+      lastDomain = domain;
+      lastApiKey = apiKey;
+
+      const btn = document.getElementById('csScrapeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scraping...';
+
+      showStatus(`Bezig met scrapen van ${domain} (max ${maxPages} pagina's)... Dit kan even duren.`, 'loading');
+      document.getElementById('results').classList.remove('show');
+
+      try {
+        const response = await fetch(`${API_URL}/api/chatsync`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ domain, maxPages })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'ChatSync scrape mislukt');
+        }
+
+        showStatus(`Gevonden: ${data.pageCount} pagina's van ${data.domain}`, 'success');
+        showChatsyncResults(data);
+      } catch (error) {
+        showStatus(error.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scrape';
+      }
+    }
+
+    function showChatsyncResults(data) {
+      document.getElementById('results').classList.add('show');
+
+      // Meta info
+      document.getElementById('meta').innerHTML = `
+        <div class="meta-item">
+          <span>Domein</span>
+          <strong>${data.domain}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Pagina's</span>
+          <strong>${data.pageCount}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Cached</span>
+          <strong>${data.cached ? 'Ja' : 'Nee'}</strong>
+        </div>
+      `;
+
+      // Pages
+      const vacanciesEl = document.getElementById('vacancies');
+
+      if (data.pages.length === 0) {
+        vacanciesEl.innerHTML = `
+          <div class="no-vacancies">
+            <p>Geen pagina's gevonden voor dit domein.</p>
+          </div>
+        `;
+      } else {
+        vacanciesEl.innerHTML = data.pages.map(page => `
+          <div class="vacancy">
+            <h3>${escapeHtml(page.title)} <span class="skill">${page.page_type}</span></h3>
+            <div class="vacancy-meta">
+              <span>${escapeHtml(page.url)}</span>
+            </div>
+            ${page.meta_description ? `<p><em>${escapeHtml(page.meta_description)}</em></p>` : ''}
+            <p>${escapeHtml(page.content.substring(0, 300))}${page.content.length > 300 ? '...' : ''}</p>
+            ${page.headings && page.headings.length > 0 ? `
+              <div class="skills">
+                ${page.headings.slice(0, 8).map(h => `<span class="skill">${escapeHtml(h)}</span>`).join('')}
+              </div>
+            ` : ''}
+            <a href="${page.url}" target="_blank" class="vacancy-link">Bekijk pagina</a>
+          </div>
+        `).join('');
+      }
+
+      // JSON output
+      document.getElementById('jsonPre').textContent = JSON.stringify(data, null, 2);
+
+      // Curl output
+      const maxPages = parseInt(document.getElementById('csMaxPages').value);
+      document.getElementById('curlPre').textContent = generateChatsyncCurl(lastDomain, lastApiKey, maxPages);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Init ChatSync curl preview
+    updateChatsyncCurl();
   </script>
 </body>
 </html>
