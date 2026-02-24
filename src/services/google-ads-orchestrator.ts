@@ -24,11 +24,12 @@ export class GoogleAdsOrchestrator {
 
     const regionCode = this.client.getRegionCode(region);
 
-    // 1. Find advertiser
-    console.log(`[GoogleAds] Searching advertiser for ${domain}...`);
-    const suggestion = await this.client.searchAdvertiser(domain, regionCode);
+    // 1. Fetch creatives directly by domain (works for all advertisers)
+    console.log(`[GoogleAds] Fetching ads for ${domain} (max ${MAX_ADS})...`);
+    const creatives = await this.client.searchCreatives(domain, regionCode, MAX_ADS);
+    console.log(`[GoogleAds] Found ${creatives.length} ads`);
 
-    if (!suggestion) {
+    if (creatives.length === 0) {
       const emptyResponse: GoogleAdsResponse = {
         domain,
         region,
@@ -42,26 +43,36 @@ export class GoogleAdsOrchestrator {
       return emptyResponse;
     }
 
-    console.log(`[GoogleAds] Found advertiser: ${suggestion.name} (${suggestion.id})`);
+    // 2. Get advertiser info from first creative + details lookup
+    const firstCreative = creatives[0];
+    const advertiserId = firstCreative.advertiserId;
+    console.log(`[GoogleAds] Found advertiser: ${firstCreative.advertiserName} (${advertiserId})`);
 
-    // 2. Get advertiser details
-    const details = await this.client.getAdvertiserDetails(suggestion.id);
+    let advertiser: GoogleAdsResponse['advertiser'] = null;
+    try {
+      const suggestion = await this.client.searchAdvertiser(domain, regionCode);
+      const details = await this.client.getAdvertiserDetails(advertiserId);
 
-    const advertiser = {
-      id: suggestion.id,
-      name: details?.name || suggestion.name,
-      country: details?.country || suggestion.country,
-      verificationStatus: details?.verified ? 'verified' as const : 'unverified' as const,
-      adCountRange: {
-        low: suggestion.adCountLow,
-        high: suggestion.adCountHigh,
-      },
-    };
-
-    // 3. Fetch creatives
-    console.log(`[GoogleAds] Fetching ads for ${domain} (max ${MAX_ADS})...`);
-    const creatives = await this.client.searchCreatives(domain, regionCode, MAX_ADS);
-    console.log(`[GoogleAds] Found ${creatives.length} ads`);
+      advertiser = {
+        id: advertiserId,
+        name: details?.name || firstCreative.advertiserName,
+        country: details?.country || suggestion?.country || null,
+        verificationStatus: details?.verified ? 'verified' as const : 'unverified' as const,
+        adCountRange: suggestion ? {
+          low: suggestion.adCountLow,
+          high: suggestion.adCountHigh,
+        } : null,
+      };
+    } catch {
+      // Fallback: use info from creative
+      advertiser = {
+        id: advertiserId,
+        name: firstCreative.advertiserName,
+        country: null,
+        verificationStatus: 'unknown' as const,
+        adCountRange: null,
+      };
+    }
 
     // 4. Fetch detail for each creative (impressions, targeting)
     const ads: GoogleAd[] = [];
