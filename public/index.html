@@ -473,6 +473,10 @@
         <span class="icon">📢</span>
         <span>Google Ads</span>
       </button>
+      <button class="scraper-tab" data-scraper="linkedinads" onclick="selectScraper('linkedinads')">
+        <span class="icon">💼</span>
+        <span>LinkedIn Ads</span>
+      </button>
       <button class="scraper-tab disabled" data-scraper="company" onclick="selectScraper('company')">
         <span class="icon">🏢</span>
         <span>Bedrijfsinfo</span>
@@ -597,6 +601,30 @@
       </div>
     </div>
 
+    <!-- LinkedIn Ads Scraper Panel -->
+    <div id="panel-linkedinads" class="scraper-panel">
+      <div class="scraper-description">
+        Scrape de LinkedIn Ad Library. Bekijk welke advertenties een bedrijf draait op LinkedIn, inclusief ad copy, headlines en landing pages.
+      </div>
+
+      <div class="card">
+        <div class="api-key-group">
+          <label for="liApiKey">API Key:</label>
+          <input type="text" id="liApiKey" value="test123" placeholder="Je API key">
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="liAccountOwner" placeholder="bijv. Microsoft">
+          <button id="liScrapeBtn" onclick="linkedInAdsScrape()">Scrape</button>
+        </div>
+
+        <div id="liCurlSection" class="curl-box output-box">
+          <button class="copy-btn" onclick="copyLiCurl()">Kopieer</button>
+          <pre id="liCurlCommand"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- Company Info Scraper Panel (Coming Soon) -->
     <div id="panel-company" class="scraper-panel">
       <div class="scraper-description">
@@ -674,6 +702,11 @@
       googleads: {
         endpoint: '/api/google-ads',
         name: 'Google Ads',
+        enabled: true
+      },
+      linkedinads: {
+        endpoint: '/api/linkedin-ads',
+        name: 'LinkedIn Ads',
         enabled: true
       },
       company: {
@@ -1291,6 +1324,145 @@
 
     // Init Google Ads curl preview
     updateGoogleAdsCurl();
+
+    // === LinkedIn Ads Functions ===
+
+    document.getElementById('liAccountOwner').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') linkedInAdsScrape();
+    });
+    document.getElementById('liAccountOwner').addEventListener('input', updateLinkedInAdsCurl);
+    document.getElementById('liApiKey').addEventListener('input', updateLinkedInAdsCurl);
+
+    function generateLinkedInAdsCurl(accountOwner, apiKey) {
+      return `curl -X POST "${API_URL}/api/linkedin-ads" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '{"accountOwner": "${accountOwner}"}'`;
+    }
+
+    function updateLinkedInAdsCurl() {
+      const accountOwner = document.getElementById('liAccountOwner').value.trim() || 'Microsoft';
+      const apiKey = document.getElementById('liApiKey').value.trim() || 'YOUR_API_KEY';
+      const curl = generateLinkedInAdsCurl(accountOwner, apiKey);
+      document.getElementById('liCurlCommand').textContent = curl;
+      document.getElementById('liCurlSection').classList.add('show');
+    }
+
+    function copyLiCurl() {
+      const curl = document.getElementById('liCurlCommand').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    async function linkedInAdsScrape() {
+      const accountOwner = document.getElementById('liAccountOwner').value.trim();
+      const apiKey = document.getElementById('liApiKey').value.trim();
+
+      if (!accountOwner) {
+        showStatus('Voer een bedrijfsnaam in', 'error');
+        return;
+      }
+
+      lastDomain = accountOwner;
+      lastApiKey = apiKey;
+
+      const btn = document.getElementById('liScrapeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scraping...';
+
+      showStatus(`Bezig met ophalen van LinkedIn Ads voor "${accountOwner}"... Dit kan even duren (Playwright).`, 'loading');
+      document.getElementById('results').classList.remove('show');
+
+      try {
+        const response = await fetch(`${API_URL}/api/linkedin-ads`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({ accountOwner })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'LinkedIn Ads scrape mislukt');
+        }
+
+        const adCount = data.ads ? data.ads.length : 0;
+        showStatus(`Gevonden: ${adCount} advertentie(s) voor "${data.accountOwner}" (totaal: ${data.totalResults || '?'})`, 'success');
+        showLinkedInAdsResults(data);
+      } catch (error) {
+        showStatus(error.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scrape';
+      }
+    }
+
+    function showLinkedInAdsResults(data) {
+      document.getElementById('results').classList.add('show');
+
+      document.getElementById('meta').innerHTML = `
+        <div class="meta-item">
+          <span>Bedrijf</span>
+          <strong>${escapeHtml(data.accountOwner)}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Totaal advertenties</span>
+          <strong>${data.totalResults ? data.totalResults.toLocaleString() : '?'}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Opgehaald</span>
+          <strong>${data.adCount}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Cached</span>
+          <strong>${data.cached ? 'Ja' : 'Nee'}</strong>
+        </div>
+      `;
+
+      const vacanciesEl = document.getElementById('vacancies');
+
+      if (!data.ads || data.ads.length === 0) {
+        vacanciesEl.innerHTML = `
+          <div class="no-vacancies">
+            <p>Geen advertenties gevonden voor "${escapeHtml(data.accountOwner)}".</p>
+          </div>
+        `;
+      } else {
+        vacanciesEl.innerHTML = data.ads.map(ad => {
+          const typeColors = {
+            single_image: '#10b981', video: '#8b5cf6', carousel: '#f59e0b',
+            text: '#3b82f6', document: '#6366f1', event: '#ec4899', unknown: '#64748b'
+          };
+          const typeColor = typeColors[ad.adType] || '#64748b';
+
+          return `
+            <div class="vacancy">
+              <h3>
+                <span class="skill" style="background: ${typeColor}; color: white;">${escapeHtml(ad.adType)}</span>
+                ${ad.advertiserName ? escapeHtml(ad.advertiserName) : ''}
+              </h3>
+              ${ad.headline ? `<p style="font-weight: 600; margin: 0.5rem 0;">${escapeHtml(ad.headline)}</p>` : ''}
+              ${ad.text ? `<p style="color: #94a3b8; font-size: 0.875rem; margin: 0.5rem 0;">${escapeHtml(ad.text)}</p>` : ''}
+              <div class="vacancy-meta">
+                ${ad.paidBy ? `<span>Betaald door: ${escapeHtml(ad.paidBy)}</span>` : ''}
+                ${ad.adId ? `<span>ID: ${escapeHtml(ad.adId)}</span>` : ''}
+              </div>
+              ${ad.landingPageUrl ? `<a href="${ad.landingPageUrl}" target="_blank" class="vacancy-link">Landing page &rarr;</a>` : ''}
+              ${ad.advertiserLinkedInUrl ? `<a href="${ad.advertiserLinkedInUrl}" target="_blank" class="vacancy-link" style="margin-left: 0.5rem;">LinkedIn profiel &rarr;</a>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      // Store for JSON/curl display
+      document.getElementById('jsonPre').textContent = JSON.stringify(data, null, 2);
+      document.getElementById('curlPre').textContent = generateLinkedInAdsCurl(data.accountOwner, lastApiKey);
+    }
+
+    // Init LinkedIn Ads curl preview
+    updateLinkedInAdsCurl();
   </script>
 </body>
 </html>
