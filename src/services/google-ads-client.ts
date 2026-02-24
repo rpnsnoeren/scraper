@@ -152,10 +152,13 @@ export class GoogleAdsClient {
         creatives.push(this.parseCreative(item));
       }
 
+      // Stop if we got fewer than a full page (no more results)
+      if (items.length < pageSize) break;
+
       offset += pageSize;
 
       // Rate limit: 500ms between pages
-      if (creatives.length < maxAds && items.length === pageSize) {
+      if (creatives.length < maxAds) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }

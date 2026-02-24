@@ -1175,7 +1175,7 @@
 
       // Meta info
       const advertiser = data.advertiser;
-      const adsRange = data.adsRange || {};
+      const adCountRange = advertiser?.adCountRange;
       const adCount = data.ads ? data.ads.length : 0;
 
       document.getElementById('meta').innerHTML = `
@@ -1197,14 +1197,14 @@
           <strong>${escapeHtml(advertiser.verificationStatus || 'Onbekend')}</strong>
         </div>
         ` : ''}
-        ${adsRange.min !== undefined ? `
+        ${adCountRange && adCountRange.low ? `
         <div class="meta-item">
-          <span>Geschat aantal ads</span>
-          <strong>${adsRange.min.toLocaleString()} - ${adsRange.max.toLocaleString()}</strong>
+          <span>Geschat totaal</span>
+          <strong>${adCountRange.low.toLocaleString()} - ${adCountRange.high.toLocaleString()}</strong>
         </div>
         ` : ''}
         <div class="meta-item">
-          <span>Totaal opgehaald</span>
+          <span>Opgehaald</span>
           <strong>${adCount}</strong>
         </div>
         <div class="meta-item">
@@ -1235,9 +1235,14 @@
 
           let impressionsHtml = '';
           if (ad.impressions) {
+            const low = ad.impressions.low ? ad.impressions.low.toLocaleString() : '?';
+            const high = ad.impressions.high ? ad.impressions.high.toLocaleString() : '?';
+            const platformsStr = ad.impressions.platforms && ad.impressions.platforms.length > 0
+              ? ad.impressions.platforms.map(p => `${escapeHtml(p.name)}: ${p.low ? p.low.toLocaleString() : '?'} - ${p.high ? p.high.toLocaleString() : '?'}`).join(', ')
+              : '';
             impressionsHtml = `<p style="color: #94a3b8; font-size: 0.875rem;">
-              Impressies: ${ad.impressions.min ? ad.impressions.min.toLocaleString() : '?'} - ${ad.impressions.max ? ad.impressions.max.toLocaleString() : '?'}
-              ${ad.impressions.platforms ? `<br>Platformen: ${ad.impressions.platforms.map(p => escapeHtml(p)).join(', ')}` : ''}
+              Impressies: ${low} - ${high}
+              ${platformsStr ? `<br>Platformen: ${platformsStr}` : ''}
             </p>`;
           }
 
