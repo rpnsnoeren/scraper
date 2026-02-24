@@ -84,7 +84,7 @@ export class LinkedInAdsClient {
 
   private parseAdCard(ariaLabel: string, liContent: string): AdCard | null {
     // aria-label format: "Microsoft, Advertentie met één enkele afbeelding, details weergeven"
-    const parts = ariaLabel.split(',').map(p => p.trim());
+    const parts = this.decodeEntities(ariaLabel).split(',').map(p => p.trim());
     if (parts.length < 2) return null;
 
     const advertiserName = parts[0];
@@ -112,10 +112,10 @@ export class LinkedInAdsClient {
   }
 
   private extractAdText(html: string): string | null {
-    const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    const pRegex = /<p(?:\s[^>]*)?>([^]*?)<\/p>/gi;
     let match;
     while ((match = pRegex.exec(html)) !== null) {
-      const text = this.stripTags(match[1]).trim();
+      const text = this.decodeEntities(this.stripTags(match[1]).trim());
       if (text && text.toLowerCase() !== 'gepromoot') {
         return text;
       }
@@ -130,7 +130,7 @@ export class LinkedInAdsClient {
     while ((match = imgRegex.exec(html)) !== null) {
       const fullTag = match[0];
       if (!/alt="advertiser logo"/i.test(fullTag)) {
-        return match[1];
+        return this.decodeEntities(match[1]);
       }
     }
     return null;
@@ -141,7 +141,7 @@ export class LinkedInAdsClient {
     const linkRegex = /<a[^>]+href="([^"]+)"[^>]*>/gi;
     let match;
     while ((match = linkRegex.exec(html)) !== null) {
-      const href = match[1];
+      const href = this.decodeEntities(match[1]);
       if (href.startsWith('http') && !href.includes('linkedin.com')) {
         // Strip trk query parameter
         return this.stripTrkParam(href);
@@ -151,12 +151,12 @@ export class LinkedInAdsClient {
   }
 
   private extractPaidBy(html: string): string | null {
-    // Look for "Betaald door <name>" pattern in <p> tags
-    const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
+    // Look for "Betaald door <name>" or "Paid for by <name>" pattern in <p> tags
+    const pRegex = /<p(?:\s[^>]*)?>([^]*?)<\/p>/gi;
     let match;
     while ((match = pRegex.exec(html)) !== null) {
-      const text = this.stripTags(match[1]).trim();
-      const paidByMatch = text.match(/Betaald door\s+(.+)/i);
+      const text = this.decodeEntities(this.stripTags(match[1]).trim());
+      const paidByMatch = text.match(/(?:Betaald door|Paid for by)\s+(.+)/i);
       if (paidByMatch) {
         return paidByMatch[1].trim();
       }
@@ -165,15 +165,22 @@ export class LinkedInAdsClient {
   }
 
   private extractFullText(html: string): string | null {
-    // Find the longest <p> that isn't metadata (not "Gepromoot", not "Betaald door", not ad type descriptions)
-    const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/gi;
-    let longest: string | null = null;
-    let longestLen = 0;
+    // Primary: look for commentary__content class (LinkedIn's ad text container)
+    const commentaryMatch = html.match(/<p[^>]*class="[^"]*commentary__content[^"]*"[^>]*>([^]*?)<\/p>/i);
+    if (commentaryMatch) {
+      const text = this.decodeEntities(this.stripTags(commentaryMatch[1]).trim());
+      if (text) return text;
+    }
+
+    // Fallback: find the first non-metadata <p> with substantial text
+    // Use <p(?:\s...)> to avoid matching <path>, <pre> etc.
+    const pRegex = /<p(?:\s[^>]*)?>([^]*?)<\/p>/gi;
     let match;
 
     const metadataPatterns = [
       /^gepromoot$/i,
       /^betaald door/i,
+      /^paid for by/i,
       /^advertentie met/i,
       /^single image ad$/i,
       /^video ad$/i,
@@ -186,22 +193,26 @@ export class LinkedInAdsClient {
       /^tekstadvertentie$/i,
       /^documentadvertentie$/i,
       /^evenementadvertentie$/i,
+      /^uitgevoerd van/i,
+      /^geschatte aantal/i,
+      /^belangrijkste doelgroep/i,
+      /^targeting omvat/i,
+      /^deze advertentie kan/i,
+      /^het kan tot \d+ uur/i,
+      /^totaal aantal/i,
     ];
 
     while ((match = pRegex.exec(html)) !== null) {
-      const text = this.stripTags(match[1]).trim();
-      if (!text) continue;
+      const text = this.decodeEntities(this.stripTags(match[1]).trim());
+      if (!text || text.length < 30) continue;
 
       const isMetadata = metadataPatterns.some(p => p.test(text));
       if (isMetadata) continue;
 
-      if (text.length > longestLen) {
-        longest = text;
-        longestLen = text.length;
-      }
+      return text;
     }
 
-    return longest;
+    return null;
   }
 
   private extractAdvertiserLinkedInUrl(html: string): string | null {
@@ -211,7 +222,7 @@ export class LinkedInAdsClient {
     if (!match) return null;
 
     // Strip query parameters
-    const url = match[1];
+    const url = this.decodeEntities(match[1]);
     try {
       const parsed = new URL(url);
       return `${parsed.origin}${parsed.pathname}`;
@@ -226,7 +237,7 @@ export class LinkedInAdsClient {
     if (!imgMatch) return null;
 
     const srcMatch = imgMatch[0].match(/src="([^"]+)"/);
-    return srcMatch ? srcMatch[1] : null;
+    return srcMatch ? this.decodeEntities(srcMatch[1]) : null;
   }
 
   private stripTrkParam(url: string): string {
@@ -242,5 +253,23 @@ export class LinkedInAdsClient {
 
   private stripTags(html: string): string {
     return html.replace(/<[^>]+>/g, '');
+  }
+
+  private decodeEntities(text: string): string {
+    let prev = '';
+    let result = text;
+    // Loop to handle double-encoded entities like &amp;#39; → &#39; → '
+    while (result !== prev) {
+      prev = result;
+      result = result
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&apos;/g, "'")
+        .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)));
+    }
+    return result;
   }
 }
