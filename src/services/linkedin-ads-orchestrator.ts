@@ -14,8 +14,8 @@ export class LinkedInAdsOrchestrator {
     this.client = new LinkedInAdsClient();
   }
 
-  async scrape(accountOwner: string, country?: string, maxAds: number = 25): Promise<LinkedInAdsResponse> {
-    const cacheKey = `linkedinads:${accountOwner.toLowerCase()}:${country || 'all'}`;
+  async scrape(accountOwner: string, maxAds: number = 25): Promise<LinkedInAdsResponse> {
+    const cacheKey = `linkedinads:${accountOwner.toLowerCase()}`;
 
     const cached = await this.cache.get<LinkedInAdsResponse>(cacheKey);
     if (cached) {
@@ -34,7 +34,6 @@ export class LinkedInAdsOrchestrator {
     if (searchResult.ads.length === 0) {
       const emptyResponse: LinkedInAdsResponse = {
         accountOwner,
-        country: country || null,
         adCount: 0,
         totalResults: searchResult.totalResults,
         ads: [],
@@ -94,7 +93,6 @@ export class LinkedInAdsOrchestrator {
 
     const response: LinkedInAdsResponse = {
       accountOwner,
-      country: country || null,
       adCount: ads.length,
       totalResults: searchResult.totalResults,
       ads,

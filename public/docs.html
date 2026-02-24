@@ -743,11 +743,6 @@
                 <td>Bedrijfsnaam om op te zoeken</td>
               </tr>
               <tr>
-                <td><code>country</code> <span class="optional">optional</span></td>
-                <td><code>string</code></td>
-                <td>2-letter ISO country code</td>
-              </tr>
-              <tr>
                 <td><code>maxAds</code> <span class="optional">optional</span></td>
                 <td><code>number</code></td>
                 <td>Maximum aantal advertenties (default: 25, max: 50)</td>
@@ -760,7 +755,6 @@
             <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
             <pre><code>{
   <span class="json-key">"accountOwner"</span>: <span class="json-string">"Microsoft"</span>,
-  <span class="json-key">"country"</span>: <span class="json-string">"NL"</span>,
   <span class="json-key">"maxAds"</span>: <span class="json-number">25</span>
 }</code></pre>
           </div>
@@ -776,7 +770,6 @@
             <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
             <pre><code>{
   <span class="json-key">"accountOwner"</span>: <span class="json-string">"Microsoft"</span>,
-  <span class="json-key">"country"</span>: <span class="json-null">null</span>,
   <span class="json-key">"adCount"</span>: <span class="json-number">12</span>,
   <span class="json-key">"totalResults"</span>: <span class="json-number">150</span>,
   <span class="json-key">"ads"</span>: [
@@ -854,18 +847,13 @@
                 <td>De gezochte bedrijfsnaam</td>
               </tr>
               <tr>
-                <td><code>country</code></td>
-                <td><code>string | null</code></td>
-                <td>Land filter (null als niet opgegeven)</td>
-              </tr>
-              <tr>
                 <td><code>adCount</code></td>
                 <td><code>number</code></td>
                 <td>Aantal opgehaalde advertenties</td>
               </tr>
               <tr>
                 <td><code>totalResults</code></td>
-                <td><code>number</code></td>
+                <td><code>number | null</code></td>
                 <td>Totaal aantal resultaten in LinkedIn</td>
               </tr>
               <tr>
@@ -880,12 +868,12 @@
               </tr>
               <tr>
                 <td><code>ads[].advertiserLogoUrl</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>URL van het logo</td>
               </tr>
               <tr>
                 <td><code>ads[].advertiserLinkedInUrl</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>LinkedIn bedrijfspagina URL</td>
               </tr>
               <tr>
@@ -895,27 +883,27 @@
               </tr>
               <tr>
                 <td><code>ads[].text</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>Advertentietekst</td>
               </tr>
               <tr>
                 <td><code>ads[].headline</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>Headline/titel</td>
               </tr>
               <tr>
                 <td><code>ads[].imageUrl</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>URL van de advertentie-afbeelding</td>
               </tr>
               <tr>
                 <td><code>ads[].landingPageUrl</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>Landing page URL</td>
               </tr>
               <tr>
                 <td><code>ads[].paidBy</code></td>
-                <td><code>string</code></td>
+                <td><code>string | null</code></td>
                 <td>Betaald door</td>
               </tr>
               <tr>

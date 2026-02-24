@@ -7,7 +7,7 @@ export async function linkedInAdsRoutes(fastify: FastifyInstance, orchestrator: 
   fastify.post('/api/linkedin-ads', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const body = LinkedInAdsRequestSchema.parse(request.body);
-      const result = await orchestrator.scrape(body.accountOwner, body.country, body.maxAds);
+      const result = await orchestrator.scrape(body.accountOwner, body.maxAds);
       return result;
     } catch (error) {
       if (error instanceof ZodError) {

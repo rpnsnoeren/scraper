@@ -1449,8 +1449,8 @@
                 ${ad.paidBy ? `<span>Betaald door: ${escapeHtml(ad.paidBy)}</span>` : ''}
                 ${ad.adId ? `<span>ID: ${escapeHtml(ad.adId)}</span>` : ''}
               </div>
-              ${ad.landingPageUrl ? `<a href="${ad.landingPageUrl}" target="_blank" class="vacancy-link">Landing page &rarr;</a>` : ''}
-              ${ad.advertiserLinkedInUrl ? `<a href="${ad.advertiserLinkedInUrl}" target="_blank" class="vacancy-link" style="margin-left: 0.5rem;">LinkedIn profiel &rarr;</a>` : ''}
+              ${ad.landingPageUrl ? `<a href="${escapeHtml(ad.landingPageUrl)}" target="_blank" class="vacancy-link">Landing page &rarr;</a>` : ''}
+              ${ad.advertiserLinkedInUrl ? `<a href="${escapeHtml(ad.advertiserLinkedInUrl)}" target="_blank" class="vacancy-link" style="margin-left: 0.5rem;">LinkedIn profiel &rarr;</a>` : ''}
             </div>
           `;
         }).join('');

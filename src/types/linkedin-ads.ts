@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const LinkedInAdsRequestSchema = z.object({
   accountOwner: z.string().min(1, 'accountOwner is required'),
-  country: z.string().length(2).optional(),
   maxAds: z.number().int().min(1).max(50).optional().default(25),
 });
 
@@ -29,7 +28,6 @@ export type LinkedInAd = z.infer<typeof LinkedInAdSchema>;
 
 export const LinkedInAdsResponseSchema = z.object({
   accountOwner: z.string(),
-  country: z.string().nullable(),
   adCount: z.number(),
   totalResults: z.number().nullable(),
   ads: z.array(LinkedInAdSchema),

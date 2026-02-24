@@ -47,8 +47,8 @@ export class LinkedInAdsClient {
     if (headingMatch) {
       const numMatch = headingMatch[1].match(/([\d.]+)/);
       if (numMatch) {
-        // Dutch uses dots as thousands separators: "26.841" -> 26841
-        totalResults = parseInt(numMatch[1].replace(/\./g, ''), 10);
+        // Dutch uses dots, English uses commas as thousands separators: "26.841" / "26,841" -> 26841
+        totalResults = parseInt(numMatch[1].replace(/[.,]/g, ''), 10);
       }
     }
 
