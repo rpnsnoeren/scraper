@@ -8,8 +8,10 @@ import { Orchestrator } from './services/orchestrator';
 import { scrapeRoutes } from './routes/scrape';
 import { chatsyncRoutes } from './routes/chatsync';
 import { googleAdsRoutes } from './routes/google-ads';
+import { linkedInAdsRoutes } from './routes/linkedin-ads';
 import { ChatSyncOrchestrator } from './services/chatsync-orchestrator';
 import { GoogleAdsOrchestrator } from './services/google-ads-orchestrator';
+import { LinkedInAdsOrchestrator } from './services/linkedin-ads-orchestrator';
 import { CacheService } from './services/cache';
 import { ScraperService } from './services/scraper';
 import { DiscoveryService } from './services/discovery';
@@ -45,11 +47,13 @@ async function main() {
   const discovery = new DiscoveryService(scraper);
   const chatsyncOrchestrator = new ChatSyncOrchestrator(cache, scraper, discovery);
   const googleAdsOrchestrator = new GoogleAdsOrchestrator(cache);
+  const linkedInAdsOrchestrator = new LinkedInAdsOrchestrator(cache, scraper);
 
   // Register routes
   await scrapeRoutes(fastify, orchestrator);
   await chatsyncRoutes(fastify, chatsyncOrchestrator);
   await googleAdsRoutes(fastify, googleAdsOrchestrator);
+  await linkedInAdsRoutes(fastify, linkedInAdsOrchestrator);
 
   // Serve docs page
   fastify.get('/docs', async (request, reply) => {
