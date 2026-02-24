@@ -712,6 +712,227 @@
         </div>
       </div>
 
+      <!-- POST /api/linkedin-ads -->
+      <div class="endpoint" id="endpoint-linkedin-ads">
+        <div class="endpoint-header" onclick="toggleEndpoint('endpoint-linkedin-ads')">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/linkedin-ads</span>
+          <span class="endpoint-desc">Scrape LinkedIn Ad Library</span>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p>Scrape de LinkedIn Ad Library voor advertenties van een specifiek bedrijf.</p>
+
+          <div class="warning-box">
+            Deze scraper gebruikt Playwright en kan 30-60 seconden duren afhankelijk van het aantal advertenties.
+          </div>
+
+          <h3>Request Parameters</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>accountOwner</code> <span class="required">*required</span></td>
+                <td><code>string</code></td>
+                <td>Bedrijfsnaam om op te zoeken</td>
+              </tr>
+              <tr>
+                <td><code>country</code> <span class="optional">optional</span></td>
+                <td><code>string</code></td>
+                <td>2-letter ISO country code</td>
+              </tr>
+              <tr>
+                <td><code>maxAds</code> <span class="optional">optional</span></td>
+                <td><code>number</code></td>
+                <td>Maximum aantal advertenties (default: 25, max: 50)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Request Body</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"accountOwner"</span>: <span class="json-string">"Microsoft"</span>,
+  <span class="json-key">"country"</span>: <span class="json-string">"NL"</span>,
+  <span class="json-key">"maxAds"</span>: <span class="json-number">25</span>
+}</code></pre>
+          </div>
+
+          <h3>cURL Command</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre id="curlLinkedInAds"><code></code></pre>
+          </div>
+
+          <h3>Response (200 OK)</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"accountOwner"</span>: <span class="json-string">"Microsoft"</span>,
+  <span class="json-key">"country"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"adCount"</span>: <span class="json-number">12</span>,
+  <span class="json-key">"totalResults"</span>: <span class="json-number">150</span>,
+  <span class="json-key">"ads"</span>: [
+    {
+      <span class="json-key">"adId"</span>: <span class="json-string">"12345678"</span>,
+      <span class="json-key">"advertiserName"</span>: <span class="json-string">"Microsoft"</span>,
+      <span class="json-key">"advertiserLogoUrl"</span>: <span class="json-string">"https://media.licdn.com/dms/image/..."</span>,
+      <span class="json-key">"advertiserLinkedInUrl"</span>: <span class="json-string">"https://www.linkedin.com/company/microsoft"</span>,
+      <span class="json-key">"adType"</span>: <span class="json-string">"single_image"</span>,
+      <span class="json-key">"text"</span>: <span class="json-string">"Ontdek de nieuwste innovaties van Microsoft..."</span>,
+      <span class="json-key">"headline"</span>: <span class="json-string">"Transformeer je business met AI"</span>,
+      <span class="json-key">"imageUrl"</span>: <span class="json-string">"https://media.licdn.com/dms/image/..."</span>,
+      <span class="json-key">"landingPageUrl"</span>: <span class="json-string">"https://www.microsoft.com/nl-nl/..."</span>,
+      <span class="json-key">"paidBy"</span>: <span class="json-string">"Microsoft Corporation"</span>
+    }
+  ],
+  <span class="json-key">"cached"</span>: <span class="json-boolean">false</span>,
+  <span class="json-key">"scrapedAt"</span>: <span class="json-string">"2026-02-24T14:00:00Z"</span>
+}</code></pre>
+          </div>
+
+          <h3>Ad Types</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>single_image</code></td>
+                <td>Advertentie met een enkele afbeelding</td>
+              </tr>
+              <tr>
+                <td><code>video</code></td>
+                <td>Video advertentie</td>
+              </tr>
+              <tr>
+                <td><code>carousel</code></td>
+                <td>Carousel met meerdere afbeeldingen</td>
+              </tr>
+              <tr>
+                <td><code>text</code></td>
+                <td>Tekst-gebaseerde advertentie</td>
+              </tr>
+              <tr>
+                <td><code>document</code></td>
+                <td>Document advertentie</td>
+              </tr>
+              <tr>
+                <td><code>event</code></td>
+                <td>Event advertentie</td>
+              </tr>
+              <tr>
+                <td><code>unknown</code></td>
+                <td>Onbekend formaat</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Response Velden</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Veld</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>accountOwner</code></td>
+                <td><code>string</code></td>
+                <td>De gezochte bedrijfsnaam</td>
+              </tr>
+              <tr>
+                <td><code>country</code></td>
+                <td><code>string | null</code></td>
+                <td>Land filter (null als niet opgegeven)</td>
+              </tr>
+              <tr>
+                <td><code>adCount</code></td>
+                <td><code>number</code></td>
+                <td>Aantal opgehaalde advertenties</td>
+              </tr>
+              <tr>
+                <td><code>totalResults</code></td>
+                <td><code>number</code></td>
+                <td>Totaal aantal resultaten in LinkedIn</td>
+              </tr>
+              <tr>
+                <td><code>ads[].adId</code></td>
+                <td><code>string</code></td>
+                <td>LinkedIn advertentie ID</td>
+              </tr>
+              <tr>
+                <td><code>ads[].advertiserName</code></td>
+                <td><code>string</code></td>
+                <td>Naam van de adverteerder</td>
+              </tr>
+              <tr>
+                <td><code>ads[].advertiserLogoUrl</code></td>
+                <td><code>string</code></td>
+                <td>URL van het logo</td>
+              </tr>
+              <tr>
+                <td><code>ads[].advertiserLinkedInUrl</code></td>
+                <td><code>string</code></td>
+                <td>LinkedIn bedrijfspagina URL</td>
+              </tr>
+              <tr>
+                <td><code>ads[].adType</code></td>
+                <td><code>string</code></td>
+                <td>Type advertentie (single_image, video, carousel, text, document, event, unknown)</td>
+              </tr>
+              <tr>
+                <td><code>ads[].text</code></td>
+                <td><code>string</code></td>
+                <td>Advertentietekst</td>
+              </tr>
+              <tr>
+                <td><code>ads[].headline</code></td>
+                <td><code>string</code></td>
+                <td>Headline/titel</td>
+              </tr>
+              <tr>
+                <td><code>ads[].imageUrl</code></td>
+                <td><code>string</code></td>
+                <td>URL van de advertentie-afbeelding</td>
+              </tr>
+              <tr>
+                <td><code>ads[].landingPageUrl</code></td>
+                <td><code>string</code></td>
+                <td>Landing page URL</td>
+              </tr>
+              <tr>
+                <td><code>ads[].paidBy</code></td>
+                <td><code>string</code></td>
+                <td>Betaald door</td>
+              </tr>
+              <tr>
+                <td><code>cached</code></td>
+                <td><code>boolean</code></td>
+                <td>Of het resultaat uit cache komt</td>
+              </tr>
+              <tr>
+                <td><code>scrapedAt</code></td>
+                <td><code>string</code></td>
+                <td>Tijdstip van scraping (ISO 8601)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- GET /health -->
       <div class="endpoint" id="endpoint-health">
         <div class="endpoint-header" onclick="toggleEndpoint('endpoint-health')">
@@ -1038,6 +1259,11 @@
     document.getElementById('curlGoogleAds').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-flag">-X POST</span> <span class="curl-url">"${API_URL}/api/google-ads"</span> \\
   <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
   <span class="curl-flag">-d</span> <span class="json-string">'{"domain": "coolblue.nl", "region": "NL"}'</span></code>`;
+
+    document.getElementById('curlLinkedInAds').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-flag">-X POST</span> <span class="curl-url">"${API_URL}/api/linkedin-ads"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Authorization: Bearer YOUR_API_KEY"</span> \\
+  <span class="curl-flag">-d</span> <span class="json-string">'{"accountOwner": "Microsoft"}'</span></code>`;
 
     document.getElementById('curlHealth').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-url">"${API_URL}/health"</span></code>`;
 
