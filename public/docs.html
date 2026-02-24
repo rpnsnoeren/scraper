@@ -587,6 +587,131 @@
         </div>
       </div>
 
+      <!-- POST /api/google-ads -->
+      <div class="endpoint" id="endpoint-google-ads">
+        <div class="endpoint-header" onclick="toggleEndpoint('endpoint-google-ads')">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/google-ads</span>
+          <span class="endpoint-desc">Scrape Google Ads Transparency Center</span>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p>Scrape de Google Ads Transparency Center voor een domein. Haalt adverteerder-info op en alle actieve advertenties inclusief impressies, targeting en platform-breakdown.</p>
+
+          <h3>Request Parameters</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>domain</code> <span class="required">*required</span></td>
+                <td><code>string</code></td>
+                <td>Het domein om te zoeken (bijv. "coolblue.nl")</td>
+              </tr>
+              <tr>
+                <td><code>region</code> <span class="optional">optional</span></td>
+                <td><code>string</code></td>
+                <td>ISO landcode voor regio filter (default: "NL"). Ondersteund: NL, BE, DE, US, GB, FR, ES, IT, etc.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Request Body</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"domain"</span>: <span class="json-string">"coolblue.nl"</span>,
+  <span class="json-key">"region"</span>: <span class="json-string">"NL"</span>
+}</code></pre>
+          </div>
+
+          <h3>cURL Command</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre id="curlGoogleAds"><code></code></pre>
+          </div>
+
+          <h3>Response (200 OK)</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"domain"</span>: <span class="json-string">"coolblue.nl"</span>,
+  <span class="json-key">"region"</span>: <span class="json-string">"NL"</span>,
+  <span class="json-key">"advertiser"</span>: {
+    <span class="json-key">"id"</span>: <span class="json-string">"AR16794634669365657601"</span>,
+    <span class="json-key">"name"</span>: <span class="json-string">"Coolblue B.V."</span>,
+    <span class="json-key">"country"</span>: <span class="json-string">"NL"</span>,
+    <span class="json-key">"verificationStatus"</span>: <span class="json-string">"verified"</span>,
+    <span class="json-key">"adCountRange"</span>: { <span class="json-key">"low"</span>: <span class="json-number">80000</span>, <span class="json-key">"high"</span>: <span class="json-number">90000</span> }
+  },
+  <span class="json-key">"adCount"</span>: <span class="json-number">50</span>,
+  <span class="json-key">"ads"</span>: [
+    {
+      <span class="json-key">"creativeId"</span>: <span class="json-string">"CR12922266248049328129"</span>,
+      <span class="json-key">"advertiserId"</span>: <span class="json-string">"AR16794634669365657601"</span>,
+      <span class="json-key">"advertiserName"</span>: <span class="json-string">"Coolblue B.V."</span>,
+      <span class="json-key">"domain"</span>: <span class="json-string">"coolblue.nl"</span>,
+      <span class="json-key">"format"</span>: <span class="json-string">"image"</span>,
+      <span class="json-key">"firstShown"</span>: <span class="json-string">"2022-07-01T12:00:00.000Z"</span>,
+      <span class="json-key">"lastShown"</span>: <span class="json-string">"2026-02-24T12:00:00.000Z"</span>,
+      <span class="json-key">"daysActive"</span>: <span class="json-number">748</span>,
+      <span class="json-key">"contentUrl"</span>: <span class="json-string">"https://tpc.googlesyndication.com/..."</span>,
+      <span class="json-key">"impressions"</span>: {
+        <span class="json-key">"low"</span>: <span class="json-number">2500000</span>,
+        <span class="json-key">"high"</span>: <span class="json-number">3000000</span>,
+        <span class="json-key">"platforms"</span>: [
+          { <span class="json-key">"name"</span>: <span class="json-string">"YouTube"</span>, <span class="json-key">"low"</span>: <span class="json-number">1500000</span>, <span class="json-key">"high"</span>: <span class="json-number">1750000</span> },
+          { <span class="json-key">"name"</span>: <span class="json-string">"Display"</span>, <span class="json-key">"low"</span>: <span class="json-number">500000</span>, <span class="json-key">"high"</span>: <span class="json-number">750000</span> }
+        ]
+      },
+      <span class="json-key">"topic"</span>: <span class="json-string">"Elektronica"</span>,
+      <span class="json-key">"targeting"</span>: {
+        <span class="json-key">"demographics"</span>: <span class="json-boolean">true</span>,
+        <span class="json-key">"geographic"</span>: <span class="json-boolean">true</span>,
+        <span class="json-key">"contextual"</span>: <span class="json-boolean">true</span>,
+        <span class="json-key">"customerLists"</span>: <span class="json-boolean">false</span>
+      }
+    }
+  ],
+  <span class="json-key">"cached"</span>: <span class="json-boolean">false</span>,
+  <span class="json-key">"scrapedAt"</span>: <span class="json-string">"2026-02-24T14:00:00Z"</span>
+}</code></pre>
+          </div>
+
+          <h3>Ad Formaten</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Formaat</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>text</code></td>
+                <td>Tekst-gebaseerde zoekadvertenties (Google Search)</td>
+              </tr>
+              <tr>
+                <td><code>image</code></td>
+                <td>Display/banner advertenties met afbeeldingen</td>
+              </tr>
+              <tr>
+                <td><code>video</code></td>
+                <td>Video advertenties (YouTube)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Ondersteunde Regio's</h3>
+          <p>NL, BE, DE, US, GB, FR, ES, IT, CA, AU, AT, CH, SE, NO, DK, FI, PL, PT, IE, BR, JP, KR, IN, MX, AR</p>
+        </div>
+      </div>
+
       <!-- GET /health -->
       <div class="endpoint" id="endpoint-health">
         <div class="endpoint-header" onclick="toggleEndpoint('endpoint-health')">
@@ -909,6 +1034,10 @@
   <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
   <span class="curl-flag">-H</span> <span class="json-string">"Authorization: Bearer YOUR_API_KEY"</span> \\
   <span class="curl-flag">-d</span> <span class="json-string">'{"domain": "example.nl", "detailLimit": 5}'</span></code>`;
+
+    document.getElementById('curlGoogleAds').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-flag">-X POST</span> <span class="curl-url">"${API_URL}/api/google-ads"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
+  <span class="curl-flag">-d</span> <span class="json-string">'{"domain": "coolblue.nl", "region": "NL"}'</span></code>`;
 
     document.getElementById('curlHealth').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-url">"${API_URL}/health"</span></code>`;
 

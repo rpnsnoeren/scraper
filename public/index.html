@@ -469,6 +469,10 @@
         <span class="icon">💬</span>
         <span>ChatSync</span>
       </button>
+      <button class="scraper-tab" data-scraper="googleads" onclick="selectScraper('googleads')">
+        <span class="icon">📢</span>
+        <span>Google Ads</span>
+      </button>
       <button class="scraper-tab disabled" data-scraper="company" onclick="selectScraper('company')">
         <span class="icon">🏢</span>
         <span>Bedrijfsinfo</span>
@@ -555,6 +559,44 @@
       </div>
     </div>
 
+    <!-- Google Ads Scraper Panel -->
+    <div id="panel-googleads" class="scraper-panel">
+      <div class="scraper-description">
+        Scrape de Google Ads Transparency Center. Bekijk welke advertenties een bedrijf draait, inclusief formaat, impressies en targeting.
+      </div>
+
+      <div class="card">
+        <div class="api-key-group">
+          <label for="gaApiKey">API Key:</label>
+          <input type="text" id="gaApiKey" value="test123" placeholder="Je API key">
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="gaDomain" placeholder="bijv. coolblue.nl">
+          <button id="gaScrapeBtn" onclick="googleAdsScrape()">Scrape</button>
+        </div>
+
+        <div class="api-key-group">
+          <label for="gaRegion">Regio:</label>
+          <select id="gaRegion" onchange="updateGoogleAdsCurl()">
+            <option value="NL" selected>NL</option>
+            <option value="BE">BE</option>
+            <option value="DE">DE</option>
+            <option value="US">US</option>
+            <option value="GB">GB</option>
+            <option value="FR">FR</option>
+            <option value="ES">ES</option>
+            <option value="IT">IT</option>
+          </select>
+        </div>
+
+        <div id="gaCurlSection" class="curl-box output-box">
+          <button class="copy-btn" onclick="copyGaCurl()">Kopieer</button>
+          <pre id="gaCurlCommand"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- Company Info Scraper Panel (Coming Soon) -->
     <div id="panel-company" class="scraper-panel">
       <div class="scraper-description">
@@ -627,6 +669,11 @@
       chatsync: {
         endpoint: '/api/chatsync',
         name: 'ChatSync',
+        enabled: true
+      },
+      googleads: {
+        endpoint: '/api/google-ads',
+        name: 'Google Ads',
         enabled: true
       },
       company: {
@@ -1039,6 +1086,206 @@
 
     // Init ChatSync curl preview
     updateChatsyncCurl();
+
+    // === Google Ads Functions ===
+
+    document.getElementById('gaDomain').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') googleAdsScrape();
+    });
+    document.getElementById('gaDomain').addEventListener('input', updateGoogleAdsCurl);
+    document.getElementById('gaApiKey').addEventListener('input', updateGoogleAdsCurl);
+    document.getElementById('gaRegion').addEventListener('change', updateGoogleAdsCurl);
+
+    function generateGoogleAdsCurl(domain, apiKey, region) {
+      const body = region !== 'NL'
+        ? `{"domain": "${domain}", "region": "${region}"}`
+        : `{"domain": "${domain}"}`;
+      return `curl -X POST "${API_URL}/api/google-ads" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '${body}'`;
+    }
+
+    function updateGoogleAdsCurl() {
+      const domain = document.getElementById('gaDomain').value.trim() || 'voorbeeld.nl';
+      const apiKey = document.getElementById('gaApiKey').value.trim() || 'YOUR_API_KEY';
+      const region = document.getElementById('gaRegion').value;
+      const curl = generateGoogleAdsCurl(domain, apiKey, region);
+      document.getElementById('gaCurlCommand').textContent = curl;
+      document.getElementById('gaCurlSection').classList.add('show');
+    }
+
+    function copyGaCurl() {
+      const curl = document.getElementById('gaCurlCommand').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    async function googleAdsScrape() {
+      const domain = document.getElementById('gaDomain').value.trim();
+      const apiKey = document.getElementById('gaApiKey').value.trim();
+      const region = document.getElementById('gaRegion').value;
+
+      if (!domain) {
+        showStatus('Voer een domeinnaam in', 'error');
+        return;
+      }
+
+      lastDomain = domain;
+      lastApiKey = apiKey;
+
+      const btn = document.getElementById('gaScrapeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scraping...';
+
+      showStatus(`Bezig met ophalen van Google Ads voor ${domain} (regio: ${region})... Dit kan even duren.`, 'loading');
+      document.getElementById('results').classList.remove('show');
+
+      try {
+        const body = { domain };
+        if (region !== 'NL') body.region = region;
+
+        const response = await fetch(`${API_URL}/api/google-ads`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Google Ads scrape mislukt');
+        }
+
+        const adCount = data.ads ? data.ads.length : 0;
+        showStatus(`Gevonden: ${adCount} advertentie(s) voor ${data.domain}`, 'success');
+        showGoogleAdsResults(data);
+      } catch (error) {
+        showStatus(error.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scrape';
+      }
+    }
+
+    function showGoogleAdsResults(data) {
+      document.getElementById('results').classList.add('show');
+
+      // Meta info
+      const advertiser = data.advertiser;
+      const adsRange = data.adsRange || {};
+      const adCount = data.ads ? data.ads.length : 0;
+
+      document.getElementById('meta').innerHTML = `
+        <div class="meta-item">
+          <span>Domein</span>
+          <strong>${escapeHtml(data.domain)}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Regio</span>
+          <strong>${escapeHtml(data.region || 'NL')}</strong>
+        </div>
+        ${advertiser ? `
+        <div class="meta-item">
+          <span>Adverteerder</span>
+          <strong>${escapeHtml(advertiser.name || 'Onbekend')}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Verificatie</span>
+          <strong>${escapeHtml(advertiser.verificationStatus || 'Onbekend')}</strong>
+        </div>
+        ` : ''}
+        ${adsRange.min !== undefined ? `
+        <div class="meta-item">
+          <span>Geschat aantal ads</span>
+          <strong>${adsRange.min.toLocaleString()} - ${adsRange.max.toLocaleString()}</strong>
+        </div>
+        ` : ''}
+        <div class="meta-item">
+          <span>Totaal opgehaald</span>
+          <strong>${adCount}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Cached</span>
+          <strong>${data.cached ? 'Ja' : 'Nee'}</strong>
+        </div>
+      `;
+
+      // Ads list
+      const vacanciesEl = document.getElementById('vacancies');
+
+      if (!advertiser) {
+        vacanciesEl.innerHTML = `
+          <div class="no-vacancies">
+            <p>Geen adverteerder gevonden voor dit domein.</p>
+          </div>
+        `;
+      } else if (!data.ads || data.ads.length === 0) {
+        vacanciesEl.innerHTML = `
+          <div class="no-vacancies">
+            <p>Geen advertenties gevonden voor dit domein.</p>
+          </div>
+        `;
+      } else {
+        vacanciesEl.innerHTML = data.ads.map(ad => {
+          const formatColors = { text: '#3b82f6', image: '#10b981', video: '#8b5cf6' };
+          const formatColor = formatColors[ad.format] || '#64748b';
+
+          let impressionsHtml = '';
+          if (ad.impressions) {
+            impressionsHtml = `<p style="color: #94a3b8; font-size: 0.875rem;">
+              Impressies: ${ad.impressions.min ? ad.impressions.min.toLocaleString() : '?'} - ${ad.impressions.max ? ad.impressions.max.toLocaleString() : '?'}
+              ${ad.impressions.platforms ? `<br>Platformen: ${ad.impressions.platforms.map(p => escapeHtml(p)).join(', ')}` : ''}
+            </p>`;
+          }
+
+          let targetingHtml = '';
+          if (ad.targeting) {
+            const methods = [];
+            if (ad.targeting.demographics) methods.push('Demographics');
+            if (ad.targeting.geographic) methods.push('Geographic');
+            if (ad.targeting.contextual) methods.push('Contextual');
+            if (ad.targeting.customerLists) methods.push('Customer Lists');
+            if (methods.length > 0) {
+              targetingHtml = `<div class="skills" style="margin-top: 0.5rem;">
+                ${methods.map(m => `<span class="skill">🎯 ${m}</span>`).join('')}
+              </div>`;
+            }
+          }
+
+          return `
+            <div class="vacancy">
+              <h3>
+                <span class="skill" style="background: ${formatColor}; color: white;">${escapeHtml(ad.format || 'unknown')}</span>
+                ${ad.advertiserName ? escapeHtml(ad.advertiserName) : ''}
+              </h3>
+              <div class="vacancy-meta">
+                ${ad.domain ? `<span>🌐 ${escapeHtml(ad.domain)}</span>` : ''}
+                ${ad.firstShown ? `<span>📅 Eerste vertoning: ${new Date(ad.firstShown).toLocaleDateString('nl-NL')}</span>` : ''}
+                ${ad.lastShown ? `<span>📅 Laatste vertoning: ${new Date(ad.lastShown).toLocaleDateString('nl-NL')}</span>` : ''}
+                ${ad.daysActive !== undefined ? `<span>⏱ ${ad.daysActive} dagen actief</span>` : ''}
+              </div>
+              ${impressionsHtml}
+              ${ad.topic ? `<div class="skills" style="margin-top: 0.5rem;"><span class="skill">${escapeHtml(ad.topic)}</span></div>` : ''}
+              ${targetingHtml}
+              ${ad.contentUrl ? `<a href="${ad.contentUrl}" target="_blank" class="vacancy-link">Bekijk advertentie &rarr;</a>` : ''}
+            </div>
+          `;
+        }).join('');
+      }
+
+      // JSON output
+      document.getElementById('jsonPre').textContent = JSON.stringify(data, null, 2);
+
+      // Curl output
+      const region = document.getElementById('gaRegion').value;
+      document.getElementById('curlPre').textContent = generateGoogleAdsCurl(lastDomain, lastApiKey, region);
+    }
+
+    // Init Google Ads curl preview
+    updateGoogleAdsCurl();
   </script>
 </body>
 </html>

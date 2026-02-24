@@ -7,7 +7,9 @@ import fastifyStatic from '@fastify/static';
 import { Orchestrator } from './services/orchestrator';
 import { scrapeRoutes } from './routes/scrape';
 import { chatsyncRoutes } from './routes/chatsync';
+import { googleAdsRoutes } from './routes/google-ads';
 import { ChatSyncOrchestrator } from './services/chatsync-orchestrator';
+import { GoogleAdsOrchestrator } from './services/google-ads-orchestrator';
 import { CacheService } from './services/cache';
 import { ScraperService } from './services/scraper';
 import { DiscoveryService } from './services/discovery';
@@ -42,10 +44,12 @@ async function main() {
   const scraper = new ScraperService();
   const discovery = new DiscoveryService(scraper);
   const chatsyncOrchestrator = new ChatSyncOrchestrator(cache, scraper, discovery);
+  const googleAdsOrchestrator = new GoogleAdsOrchestrator(cache);
 
   // Register routes
   await scrapeRoutes(fastify, orchestrator);
   await chatsyncRoutes(fastify, chatsyncOrchestrator);
+  await googleAdsRoutes(fastify, googleAdsOrchestrator);
 
   // Serve docs page
   fastify.get('/docs', async (request, reply) => {
