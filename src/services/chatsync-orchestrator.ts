@@ -88,11 +88,31 @@ export class ChatSyncOrchestrator {
       const url = targetUrls[i];
       try {
         console.log(`[ChatSync] [${i + 1}/${targetUrls.length}] ${url}`);
-        const { html, status } = await this.scraper.fetchWithHttp(url);
+        let html: string;
+        let status: number;
+        let needsPlaywright = false;
 
-        if (status >= 400) {
-          console.log(`[ChatSync]   Skipped (HTTP ${status})`);
-          continue;
+        try {
+          const result = await this.scraper.fetchWithHttp(url);
+          html = result.html;
+          status = result.status;
+          if (status >= 400) needsPlaywright = true;
+          else if (this.scraper.needsJavaScript(html)) needsPlaywright = true;
+        } catch {
+          needsPlaywright = true;
+          html = '';
+          status = 0;
+        }
+
+        if (needsPlaywright) {
+          console.log(`[ChatSync]   Fallback naar Playwright...`);
+          const result = await this.scraper.fetchWithPlaywright(url);
+          html = result.html;
+          status = result.status;
+          if (status >= 400) {
+            console.log(`[ChatSync]   Skipped (HTTP ${status})`);
+            continue;
+          }
         }
 
         const page = this.extractPage(html, url);
@@ -154,8 +174,26 @@ export class ChatSyncOrchestrator {
 
   private async discoverLinksFromHomepage(baseUrl: string, domain: string): Promise<string[]> {
     try {
-      const { html, status } = await this.scraper.fetchWithHttp(baseUrl);
-      if (status >= 400) return [baseUrl];
+      let html: string;
+      let usePlaywright = false;
+
+      try {
+        const result = await this.scraper.fetchWithHttp(baseUrl);
+        if (result.status >= 400 || this.scraper.needsJavaScript(result.html)) {
+          usePlaywright = true;
+        }
+        html = result.html;
+      } catch {
+        usePlaywright = true;
+        html = '';
+      }
+
+      if (usePlaywright) {
+        console.log(`[ChatSync] Homepage fallback naar Playwright...`);
+        const result = await this.scraper.fetchWithPlaywright(baseUrl);
+        if (result.status >= 400) return [baseUrl];
+        html = result.html;
+      }
 
       const links: string[] = [baseUrl];
       const linkRegex = /<a[^>]+href=["']([^"'#]+)["']/gi;

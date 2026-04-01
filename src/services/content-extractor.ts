@@ -15,6 +15,10 @@ export class ContentExtractor {
     content = content.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
     content = content.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
 
+    // Remove cookie consent banners/overlays
+    content = content.replace(/<div[^>]*(?:class|id)=["'][^"']*(?:cookie[-_]?(?:consent|banner|notice|popup|modal|bar|wall|overlay)|consent[-_]?(?:banner|modal|popup|overlay)|cc[-_](?:banner|window)|cmplz|onetrust|cookiebot|cookiefirst|gdpr[-_]?(?:banner|consent))[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '');
+    content = content.replace(/<div[^>]*(?:class|id)=["'][^"']*(?:cky-consent|cky-modal)[^"']*["'][^>]*>[\s\S]*?<\/div>/gi, '');
+
     // Remove nav, header, footer, aside, form elements
     content = content.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
     content = content.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
@@ -103,6 +107,10 @@ export class ContentExtractor {
 
     // Remove common icon/emoji unicode placeholders
     content = content.replace(/[\u{E000}-\u{F8FF}\u{F0000}-\u{FFFFD}]/gu, '');
+
+    // Remove cookie consent text blocks
+    content = content.replace(/(?:Wij waarderen uw privacy|We value your privacy|We gebruiken cookies|We use cookies)[\s\S]*?(?:Powered by|Cookie-instellingen opslaan|Save my preferences)\s*/gi, '');
+    content = content.replace(/(?:Toestemmingsvoorkeuren aanpassen|Manage consent preferences)[\s\S]*?(?:Powered by|Cookie-instellingen opslaan|Save my preferences)\s*/gi, '');
 
     // Clean up whitespace
     content = content.replace(/[ \t]+/g, ' ');

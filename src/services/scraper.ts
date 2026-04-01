@@ -1,4 +1,4 @@
-import { chromium, Browser } from 'playwright';
+import { chromium, Browser, Page } from 'playwright';
 
 export class ScraperService {
   private browser: Browser | null = null;
@@ -108,6 +108,9 @@ export class ScraperService {
       // Wait for content to load
       await page.waitForTimeout(3000);
 
+      // Dismiss cookie consent banners
+      await this.dismissCookieConsent(page);
+
       // Scroll to load lazy content
       await page.evaluate(async () => {
         for (let i = 0; i < 3; i++) {
@@ -140,6 +143,50 @@ export class ScraperService {
 
     const { html, status } = await this.fetchWithPlaywright(url);
     return { html, usedPlaywright: true, status };
+  }
+
+  private async dismissCookieConsent(page: Page): Promise<void> {
+    const selectors = [
+      // Veelvoorkomende cookie consent knoppen (Nederlands + Engels)
+      'button:has-text("Accepteren")',
+      'button:has-text("Alles accepteren")',
+      'button:has-text("Alle cookies accepteren")',
+      'button:has-text("Accept")',
+      'button:has-text("Accept all")',
+      'button:has-text("Accept All Cookies")',
+      'button:has-text("Akkoord")',
+      'button:has-text("Toestaan")',
+      'button:has-text("Ik ga akkoord")',
+      'button:has-text("Begrepen")',
+      'button:has-text("OK")',
+      'button:has-text("Agree")',
+      // Veelvoorkomende cookie consent frameworks
+      '#onetrust-accept-btn-handler',
+      '#CybotCookiebotDialogBodyLevelButtonLevelOptinAllowAll',
+      '.cc-accept',
+      '.cc-btn.cc-allow',
+      '[data-cookiefirst-action="accept"]',
+      '.cookie-consent-accept',
+      '.js-cookie-accept',
+      '#cookie-accept',
+      '.cmplz-accept',
+      // CookieYes
+      '.cky-btn-accept',
+      '[data-cky-tag="accept-button"]',
+    ];
+
+    for (const selector of selectors) {
+      try {
+        const button = page.locator(selector).first();
+        if (await button.isVisible({ timeout: 500 })) {
+          await button.click();
+          await page.waitForTimeout(1000);
+          return;
+        }
+      } catch {
+        // Selector niet gevonden, volgende proberen
+      }
+    }
   }
 
   async close(): Promise<void> {
