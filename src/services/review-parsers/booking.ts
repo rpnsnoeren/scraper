@@ -16,11 +16,26 @@ interface PlaywrightReviewData {
 
 export class BookingParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    // Stap 1: Haal zoekresultaten op
-    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+    // Stap 1: Probeer zoekresultaten eerst via HTTP (snel, ~2s) ipv Playwright (~30s)
+    let searchHtml: string;
+    let detailUrl: string | null = null;
 
-    // Stap 2: Zoek de eerste hotel detail-URL in de zoekresultaten
-    const detailUrl = this.extractDetailUrl(searchHtml);
+    try {
+      const { html: httpHtml } = await this.scraper.fetchWithHttp(url, 10000);
+      detailUrl = this.extractDetailUrl(httpHtml);
+      searchHtml = httpHtml;
+    } catch {
+      searchHtml = '';
+    }
+
+    // Fallback naar Playwright als HTTP geen hotel-link opleverde
+    if (!detailUrl) {
+      const { html: pwHtml } = await this.scraper.fetchWithPlaywright(url, 20000);
+      detailUrl = this.extractDetailUrl(pwHtml);
+      searchHtml = pwHtml;
+    }
+
+    // Stap 2: Geen hotel gevonden → stop
     if (!detailUrl) {
       return { reviews: [] };
     }

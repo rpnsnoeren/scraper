@@ -4,6 +4,7 @@ import { ScraperService } from '../../scraper';
 
 function createParser(): BookingParser {
   const mockScraper = {
+    fetchWithHttp: vi.fn(),
     fetchWithPlaywright: vi.fn(),
     fetchWithPlaywrightCustom: vi.fn(),
   } as unknown as ScraperService;
@@ -30,14 +31,15 @@ describe('BookingParser', () => {
     });
   });
 
-  describe('parse (twee-staps flow met Playwright scroll)', () => {
-    it('gebruikt fetchWithPlaywrightCustom en extraheert reviews via page.evaluate', async () => {
+  describe('parse (HTTP-first zoek + Playwright detail)', () => {
+    it('gebruikt fetchWithHttp voor zoekstap en fetchWithPlaywrightCustom voor reviews', async () => {
       const parser = createParser();
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
       const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
       const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
       const searchHtml = '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>';
-      mockFetchPw.mockResolvedValueOnce({ html: searchHtml, status: 200 });
+      mockFetchHttp.mockResolvedValueOnce({ html: searchHtml, status: 200 });
 
       // Simuleer Playwright custom callback resultaat
       mockFetchCustom.mockResolvedValueOnce({
@@ -55,7 +57,8 @@ describe('BookingParser', () => {
 
       const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
 
-      expect(mockFetchPw).toHaveBeenCalledTimes(1);
+      expect(mockFetchHttp).toHaveBeenCalledTimes(1);
+      expect(mockFetchPw).not.toHaveBeenCalled(); // Geen Playwright fallback nodig
       expect(mockFetchCustom).toHaveBeenCalledTimes(1);
       expect(mockFetchCustom).toHaveBeenCalledWith(
         'https://www.booking.com/hotel/nl/test-hotel.html#tab-reviews',
@@ -74,13 +77,79 @@ describe('BookingParser', () => {
       expect(result.reviews[1].text).toBe('Perfect verblijf');
     });
 
-    it('valt terug op HTML parsing als Playwright geen reviews vindt', async () => {
+    it('valt terug op Playwright als HTTP geen hotel-link vindt', async () => {
       const parser = createParser();
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
       const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
       const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
+      // HTTP geeft geen hotel-links
+      mockFetchHttp.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+      // Playwright fallback vindt de link wel
+      mockFetchPw.mockResolvedValueOnce({
+        html: '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>',
+        status: 200,
+      });
+
+      mockFetchCustom.mockResolvedValueOnce({
+        result: {
+          reviews: [
+            { author: 'Jan', rating: 7.0, positive: 'Leuk', date: 'april 2024' },
+          ],
+          averageRating: 7.0,
+        },
+        html: '',
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+
+      expect(mockFetchHttp).toHaveBeenCalledTimes(1);
+      expect(mockFetchPw).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].author).toBe('Jan');
+    });
+
+    it('valt terug op Playwright als HTTP een fout geeft', async () => {
+      const parser = createParser();
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
+      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
+      // HTTP gooit een fout
+      mockFetchHttp.mockRejectedValueOnce(new Error('HTTP fetch failed'));
+      // Playwright fallback werkt
+      mockFetchPw.mockResolvedValueOnce({
+        html: '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>',
+        status: 200,
+      });
+
+      mockFetchCustom.mockResolvedValueOnce({
+        result: {
+          reviews: [
+            { author: 'Piet', rating: 8.5, positive: 'Top', date: 'mei 2024' },
+          ],
+          averageRating: 8.5,
+        },
+        html: '',
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+
+      expect(mockFetchHttp).toHaveBeenCalledTimes(1);
+      expect(mockFetchPw).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].author).toBe('Piet');
+    });
+
+    it('valt terug op HTML parsing als Playwright geen reviews vindt', async () => {
+      const parser = createParser();
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
+      const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
       const searchHtml = '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>';
-      mockFetchPw.mockResolvedValueOnce({ html: searchHtml, status: 200 });
+      mockFetchHttp.mockResolvedValueOnce({ html: searchHtml, status: 200 });
 
       const detailHtml = 'Scored 8.0 <div data-testid="review-card"><span class="review-pos">Fijn</span></div>';
       mockFetchCustom.mockResolvedValueOnce({
@@ -96,22 +165,28 @@ describe('BookingParser', () => {
       expect(result.reviews[0].text).toBe('Fijn');
     });
 
-    it('geeft lege reviews als er geen hotel-link gevonden wordt', async () => {
+    it('geeft lege reviews als geen enkele methode een hotel-link vindt', async () => {
       const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
-      mockFetch.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
+      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+
+      // HTTP: geen link
+      mockFetchHttp.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+      // Playwright fallback: ook geen link
+      mockFetchPw.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
 
       const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetchHttp).toHaveBeenCalledTimes(1);
+      expect(mockFetchPw).toHaveBeenCalledTimes(1);
       expect(result.reviews).toEqual([]);
     });
 
     it('filtert reviews zonder tekst uit Playwright resultaten', async () => {
       const parser = createParser();
-      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchHttp = (parser as any).scraper.fetchWithHttp;
       const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
-      mockFetchPw.mockResolvedValueOnce({
+      mockFetchHttp.mockResolvedValueOnce({
         html: '<a href="/hotel/nl/test.html">Hotel</a>',
         status: 200,
       });

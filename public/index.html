@@ -1641,9 +1641,10 @@
         vacanciesEl.innerHTML = data.platforms.map(platform => {
           const platformColors = {
             google: '#4285F4', trustpilot: '#00B67A', yelp: '#D32323',
-            facebook: '#1877F2', tripadvisor: '#34E0A1'
+            facebook: '#1877F2', tripadvisor: '#34E0A1', booking: '#003580',
+            treatwell: '#7B2D8E', expedia: '#FBAF17'
           };
-          const platformColor = platformColors[(platform.name || '').toLowerCase()] || '#64748b';
+          const platformColor = platformColors[(platform.platform || '').toLowerCase()] || '#64748b';
 
           const reviewsHtml = platform.reviews && platform.reviews.length > 0
             ? platform.reviews.map(review => `
@@ -1661,7 +1662,7 @@
           return `
             <div class="vacancy" style="border-left-color: ${platformColor};">
               <h3>
-                <span class="skill" style="background: ${platformColor}; color: white;">${escapeHtml(platform.name || 'Onbekend')}</span>
+                <span class="skill" style="background: ${platformColor}; color: white;">${escapeHtml(platform.platform || 'Onbekend')}</span>
                 ${platform.averageRating ? `<span style="color: #fbbf24; margin-left: 0.5rem;">${renderStars(platform.averageRating)} ${platform.averageRating.toFixed(1)}</span>` : ''}
               </h3>
               <div class="vacancy-meta">

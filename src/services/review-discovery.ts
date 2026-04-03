@@ -42,10 +42,10 @@ export class ReviewDiscoveryService {
       url: `https://www.treatwell.nl/places/?q=${searchQuery}`,
     });
 
-    // Booking.com: zoekpagina
+    // Booking.com: zoekpagina met review-score filter voor relevantere resultaten
     platforms.push({
       platform: 'booking',
-      url: `https://www.booking.com/searchresults.html?ss=${searchQuery}`,
+      url: `https://www.booking.com/searchresults.html?ss=${searchQuery}&nflt=review_score%3D80`,
     });
 
     // Yelp: zoekpagina
