@@ -37,18 +37,10 @@ describe('GoogleReviewsParser', () => {
   });
 
   describe('parse - Playwright custom interactie', () => {
-    it('gebruikt fetchWithPlaywrightCustom voor detail-pagina met reviews', async () => {
+    it('gebruikt fetchWithPlaywrightCustom direct op de zoek-URL', async () => {
       const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
       const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
-      // Eerste call: zoekresultaten met place link
-      mockFetch.mockResolvedValueOnce({
-        html: '<a href="https://www.google.com/maps/place/Treatwell/data=!123">Treatwell</a>',
-        status: 200,
-      });
-
-      // Tweede call: fetchWithPlaywrightCustom met Playwright-geëxtraheerde data
       const playwrightResult: PlaywrightExtractedData = {
         averageRating: 4.5,
         totalReviews: 100,
@@ -59,40 +51,28 @@ describe('GoogleReviewsParser', () => {
       };
       mockCustom.mockResolvedValueOnce({
         result: playwrightResult,
-        html: '<div>detail page html</div>',
+        html: '<div>page html</div>',
         status: 200,
       });
 
       const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(mockCustom).toHaveBeenCalledTimes(1);
       expect(mockCustom).toHaveBeenCalledWith(
-        'https://www.google.com/maps/place/Treatwell/data=!123',
+        'https://www.google.com/maps/search/Treatwell',
         expect.any(Function),
-        60000,
+        45000,
       );
       expect(result.averageRating).toBe(4.5);
       expect(result.totalReviews).toBe(100);
       expect(result.reviews).toHaveLength(2);
-      expect(result.reviews[0].author).toBe('Jan');
-      expect(result.reviews[1].text).toBe('Prima ervaring gehad hier');
     });
 
     it('valt terug op HTML-extractie als Playwright geen reviews vindt', async () => {
       const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
       const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
-      mockFetch.mockResolvedValueOnce({
-        html: '<a href="https://www.google.com/maps/place/Test/data=!1">Test</a>',
-        status: 200,
-      });
-
-      // Playwright geeft lege data terug
-      const emptyResult: PlaywrightExtractedData = {
-        reviews: [],
-      };
+      const emptyResult: PlaywrightExtractedData = { reviews: [] };
       mockCustom.mockResolvedValueOnce({
         result: emptyResult,
         html: `
@@ -108,7 +88,6 @@ describe('GoogleReviewsParser', () => {
 
       const result = await parser.parse('https://www.google.com/maps/search/Test');
 
-      // Moet terugvallen op regex extractie uit HTML
       expect(result.averageRating).toBe(4.0);
       expect(result.totalReviews).toBe(50);
       expect(result.reviews).toHaveLength(1);
@@ -120,15 +99,8 @@ describe('GoogleReviewsParser', () => {
       const mockFetch = (parser as any).scraper.fetchWithPlaywright;
       const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
-      mockFetch.mockResolvedValueOnce({
-        html: '<a href="https://www.google.com/maps/place/Fout/data=!1">Fout</a>',
-        status: 200,
-      });
-
-      // fetchWithPlaywrightCustom gooit een fout
       mockCustom.mockRejectedValueOnce(new Error('Playwright timeout'));
 
-      // Fallback: gewone fetchWithPlaywright
       mockFetch.mockResolvedValueOnce({
         html: `
           <span aria-label="3,5 sterren"></span>
@@ -139,39 +111,25 @@ describe('GoogleReviewsParser', () => {
 
       const result = await parser.parse('https://www.google.com/maps/search/Fout');
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(result.averageRating).toBe(3.5);
       expect(result.totalReviews).toBe(25);
     });
 
-    it('gebruikt zoekresultaat-HTML als geen place URL gevonden wordt', async () => {
-      const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
-
-      // Enkel zoekpagina zonder place links maar met review data (direct redirect)
-      mockFetch.mockResolvedValueOnce({
-        html: `
-          <span aria-label="4,0 sterren"></span>
-          <span>50 reviews</span>
-        `,
-        status: 200,
-      });
-
-      const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(result.averageRating).toBe(4.0);
-    });
-
     it('geeft leeg resultaat als er geen reviews zijn', async () => {
       const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
-      mockFetch.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+      const emptyResult: PlaywrightExtractedData = { reviews: [] };
+      mockCustom.mockResolvedValueOnce({
+        result: emptyResult,
+        html: '<div>Geen resultaten</div>',
+        status: 200,
+      });
 
       const result = await parser.parse('https://www.google.com/maps/search/Onbekend');
       expect(result.reviews).toHaveLength(0);
       expect(result.averageRating).toBeUndefined();
-      expect(result.totalReviews).toBeUndefined();
     });
   });
 

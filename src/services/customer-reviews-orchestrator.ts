@@ -32,8 +32,14 @@ export class CustomerReviewsOrchestrator {
     console.log(`[CustomerReviews] Trying ${platformUrls.length} platforms for "${businessName}"...`);
 
     // Parse reviews from each platform with concurrency limit
-    const platforms = await this.parseWithConcurrency(platformUrls, MAX_CONCURRENT);
-    console.log(`[CustomerReviews] ${platforms.length} platforms returned reviews`);
+    const allPlatforms = await this.parseWithConcurrency(platformUrls, MAX_CONCURRENT);
+
+    // Filter platforms die geen relevante data hebben
+    // Een platform zonder reviews EN zonder totalReviews is waarschijnlijk niet relevant
+    const platforms = allPlatforms.filter(p =>
+      p.reviews.length > 0 || (p.totalReviews != null && p.totalReviews > 0)
+    );
+    console.log(`[CustomerReviews] ${platforms.length}/${allPlatforms.length} platforms met relevante data`);
 
     const response: CustomerReviewsResponse = {
       businessName,

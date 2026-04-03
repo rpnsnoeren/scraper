@@ -18,42 +18,31 @@ export interface PlaywrightExtractedData {
 
 export class GoogleReviewsParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 20000);
+    // Google Maps redirect vaak direct naar de place page bij één resultaat.
+    // Gebruik altijd fetchWithPlaywrightCustom zodat we reviews tab kunnen
+    // klikken en scrollen, ongeacht of het een zoek- of place-pagina is.
+    try {
+      const { result, html } = await this.scraper.fetchWithPlaywrightCustom<PlaywrightExtractedData>(
+        url,
+        (page) => this.extractReviewsWithPlaywright(page),
+        45000,
+      );
 
-    // Stap 1: Zoek de detail-pagina URL uit de zoekresultaten
-    const placeUrl = this.extractPlaceUrl(searchHtml);
-
-    // Stap 2: Als een place URL gevonden is, gebruik Playwright custom interactie
-    // om reviews te laden via scrollen
-    if (placeUrl) {
-      try {
-        const { result, html: detailHtml } = await this.scraper.fetchWithPlaywrightCustom<PlaywrightExtractedData>(
-          placeUrl,
-          (page) => this.extractReviewsWithPlaywright(page),
-          60000,
-        );
-
-        // Als Playwright data heeft opgeleverd, gebruik die
-        if (result.reviews.length > 0 || result.averageRating !== undefined) {
-          return {
-            averageRating: result.averageRating,
-            totalReviews: result.totalReviews,
-            reviews: this.selectRandom(result.reviews),
-          };
-        }
-
-        // Fallback: probeer regex extractie op de HTML
-        return this.extractFromHtml(detailHtml);
-      } catch {
-        // Bij fout in Playwright custom: fallback naar gewone fetch
-        const { html: detailHtml } = await this.scraper.fetchWithPlaywright(placeUrl, 20000);
-        return this.extractFromHtml(detailHtml);
+      if (result.reviews.length > 0 || result.averageRating !== undefined) {
+        return {
+          averageRating: result.averageRating,
+          totalReviews: result.totalReviews,
+          reviews: this.selectRandom(result.reviews),
+        };
       }
-    }
 
-    // Geen place URL gevonden — Google heeft mogelijk direct doorgestuurd
-    // naar een place pagina (bij exact één resultaat). Gebruik de huidige HTML.
-    return this.extractFromHtml(searchHtml);
+      // Fallback: regex extractie op de HTML
+      return this.extractFromHtml(html);
+    } catch {
+      // Bij fout: gewone fetch + regex
+      const { html } = await this.scraper.fetchWithPlaywright(url, 20000);
+      return this.extractFromHtml(html);
+    }
   }
 
   /**
@@ -127,61 +116,52 @@ export class GoogleReviewsParser extends ReviewParserBase {
         }
       }
 
-      // Individuele reviews: zoek elementen met data-review-id
-      const reviewBlocks = document.querySelectorAll('[data-review-id]');
-      for (const block of reviewBlocks) {
-        // Rating uit aria-label
+      // Individuele reviews: zoek top-level elementen met data-review-id en aria-label (auteursnaam)
+      // Google Maps heeft geneste data-review-id's — filter op degenen met aria-label (= de review container)
+      const allReviewEls = document.querySelectorAll('[data-review-id][aria-label]');
+      const seen = new Set<string>();
+
+      for (const block of allReviewEls) {
+        const reviewId = block.getAttribute('data-review-id') || '';
+        if (seen.has(reviewId)) continue;
+        seen.add(reviewId);
+
+        // Auteur: staat in aria-label van het review element zelf
+        const author = block.getAttribute('aria-label')?.trim() || undefined;
+
+        // Rating: zoek sterren in geneste elementen
         let rating: number | undefined;
         const starEl = block.querySelector('[aria-label*="sterren"],[aria-label*="stars"],[aria-label*="star"]');
         if (starEl) {
           const starLabel = starEl.getAttribute('aria-label') || '';
           const starMatch = starLabel.match(/(\d+)\s*(?:sterren|stars?)/i);
-          if (starMatch) {
-            rating = parseInt(starMatch[1], 10);
-          }
+          if (starMatch) rating = parseInt(starMatch[1], 10);
         }
 
-        // Tekst: zoek de langste tekst-span in het blok
+        // Tekst: specifieke Google class "wiI7pd" voor review tekst
         let text = '';
-        const spans = block.querySelectorAll('span');
-        for (const span of spans) {
-          const spanText = (span.textContent || '').trim();
-          // Filter korte teksten en datums
-          if (spanText.length > text.length && spanText.length > 10) {
-            text = spanText;
+        const textEl = block.querySelector('span.wiI7pd');
+        if (textEl) {
+          text = (textEl.textContent || '').trim();
+        }
+        // Fallback: langste span > 20 chars
+        if (!text) {
+          const spans = block.querySelectorAll('span');
+          for (const span of spans) {
+            const t = (span.textContent || '').trim();
+            if (t.length > text.length && t.length > 20) text = t;
           }
         }
 
-        // Als geen tekst gevonden, sla over
         if (!text) continue;
-
-        // Auteur: zoek aria-label met "Foto van" of "Photo of"
-        let author: string | undefined;
-        const authorEl = block.querySelector('[aria-label*="Foto van"],[aria-label*="Photo of"]');
-        if (authorEl) {
-          const authorLabel = authorEl.getAttribute('aria-label') || '';
-          const authorMatch = authorLabel.match(/(?:Foto van|Photo of)\s+(.+)/i);
-          if (authorMatch) {
-            author = authorMatch[1].trim();
-          }
-        }
-        // Fallback: zoek auteursnaam via button of link met aria-label
-        if (!author) {
-          const nameEl = block.querySelector('button[aria-label],a[aria-label]');
-          if (nameEl) {
-            const nameLabel = nameEl.getAttribute('aria-label') || '';
-            if (nameLabel && nameLabel.length < 50 && !nameLabel.match(/sterren|stars?|foto|photo/i)) {
-              author = nameLabel.trim();
-            }
-          }
-        }
 
         // Datum: relatieve datums
         let date: string | undefined;
+        const spans = block.querySelectorAll('span');
         for (const span of spans) {
-          const spanText = (span.textContent || '').trim();
-          if (spanText.match(/\d+\s+(?:dag|dagen|week|weken|maand|maanden|jaar|jaren|day|days|weeks?|months?|years?)\s+(?:geleden|ago)/i)) {
-            date = spanText;
+          const t = (span.textContent || '').trim();
+          if (t.match(/\d+\s+(?:dag|dagen|week|weken|maand|maanden|jaar|jaren|day|days|weeks?|months?|years?)\s+(?:geleden|ago)/i)) {
+            date = t;
             break;
           }
         }
