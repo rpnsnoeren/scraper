@@ -130,6 +130,63 @@ export class ScraperService {
     }
   }
 
+  /**
+   * Fetch met Playwright en voer custom interactie uit op de pagina.
+   * De callback ontvangt het Page object en kan scrollen, klikken, data extracten etc.
+   */
+  async fetchWithPlaywrightCustom<T>(
+    url: string,
+    callback: (page: Page) => Promise<T>,
+    timeout = 45000,
+  ): Promise<{ result: T; html: string; status: number }> {
+    if (!this.browser) {
+      this.browser = await chromium.launch({
+        headless: true,
+        args: [
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+        ],
+      });
+    }
+
+    const context = await this.browser.newContext({
+      userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      viewport: { width: 1920, height: 1080 },
+      locale: 'nl-NL',
+      timezoneId: 'Europe/Amsterdam',
+    });
+
+    const page = await context.newPage();
+
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      // @ts-ignore
+      window.chrome = { runtime: {} };
+    });
+
+    try {
+      const response = await page.goto(url, { waitUntil: 'networkidle', timeout });
+      const status = response?.status() ?? 0;
+
+      await page.waitForTimeout(2000);
+      await this.dismissCookieConsent(page);
+
+      const result = await callback(page);
+      const html = await page.content();
+
+      return { result, html, status };
+    } finally {
+      await context.close();
+    }
+  }
+
   async fetch(url: string): Promise<{ html: string; usedPlaywright: boolean; status: number }> {
     try {
       const { html, status } = await this.fetchWithHttp(url);

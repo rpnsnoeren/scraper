@@ -3,7 +3,10 @@ import { BookingParser } from '../../review-parsers/booking';
 import { ScraperService } from '../../scraper';
 
 function createParser(): BookingParser {
-  const mockScraper = { fetchWithPlaywright: vi.fn() } as unknown as ScraperService;
+  const mockScraper = {
+    fetchWithPlaywright: vi.fn(),
+    fetchWithPlaywrightCustom: vi.fn(),
+  } as unknown as ScraperService;
   return new BookingParser(mockScraper);
 }
 
@@ -27,21 +30,70 @@ describe('BookingParser', () => {
     });
   });
 
-  describe('parse (twee-staps flow)', () => {
-    it('haalt zoekresultaten op, vindt detail-URL en parset reviews', async () => {
+  describe('parse (twee-staps flow met Playwright scroll)', () => {
+    it('gebruikt fetchWithPlaywrightCustom en extraheert reviews via page.evaluate', async () => {
       const parser = createParser();
-      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
       const searchHtml = '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>';
-      const detailHtml = 'Scored 8.0 <div data-testid="review-card"><span class="review-pos">Fijn</span></div>';
-      mockFetch
-        .mockResolvedValueOnce({ html: searchHtml, status: 200 })
-        .mockResolvedValueOnce({ html: detailHtml, status: 200 });
+      mockFetchPw.mockResolvedValueOnce({ html: searchHtml, status: 200 });
+
+      // Simuleer Playwright custom callback resultaat
+      mockFetchCustom.mockResolvedValueOnce({
+        result: {
+          reviews: [
+            { author: 'Hans', rating: 8.0, positive: 'Mooi hotel', negative: 'Luidruchtig', date: 'maart 2024' },
+            { author: 'Maria', rating: 9.0, positive: 'Perfect verblijf', date: 'februari 2024' },
+          ],
+          averageRating: 8.0,
+          totalReviews: 567,
+        },
+        html: '<div>detail page html</div>',
+        status: 200,
+      });
 
       const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(mockFetch).toHaveBeenCalledWith('https://www.booking.com/hotel/nl/test-hotel.html#tab-reviews', 30000);
-      expect(result.averageRating).toBe(4.0);
+
+      expect(mockFetchPw).toHaveBeenCalledTimes(1);
+      expect(mockFetchCustom).toHaveBeenCalledTimes(1);
+      expect(mockFetchCustom).toHaveBeenCalledWith(
+        'https://www.booking.com/hotel/nl/test-hotel.html#tab-reviews',
+        expect.any(Function),
+        30000,
+      );
+
+      expect(result.averageRating).toBe(4.0); // 8.0 / 2
+      expect(result.totalReviews).toBe(567);
+      expect(result.reviews).toHaveLength(2);
+      expect(result.reviews[0].author).toBe('Hans');
+      expect(result.reviews[0].rating).toBe(4.0); // 8.0 / 2
+      expect(result.reviews[0].text).toBe('Mooi hotel | Min: Luidruchtig');
+      expect(result.reviews[1].author).toBe('Maria');
+      expect(result.reviews[1].rating).toBe(4.5); // 9.0 / 2
+      expect(result.reviews[1].text).toBe('Perfect verblijf');
+    });
+
+    it('valt terug op HTML parsing als Playwright geen reviews vindt', async () => {
+      const parser = createParser();
+      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
+      const searchHtml = '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>';
+      mockFetchPw.mockResolvedValueOnce({ html: searchHtml, status: 200 });
+
+      const detailHtml = 'Scored 8.0 <div data-testid="review-card"><span class="review-pos">Fijn</span></div>';
+      mockFetchCustom.mockResolvedValueOnce({
+        result: { reviews: [], averageRating: undefined, totalReviews: undefined },
+        html: detailHtml,
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+
+      expect(result.averageRating).toBe(4.0); // Scored 8.0 / 2 via HTML fallback
       expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].text).toBe('Fijn');
     });
 
     it('geeft lege reviews als er geen hotel-link gevonden wordt', async () => {
@@ -52,6 +104,33 @@ describe('BookingParser', () => {
       const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(result.reviews).toEqual([]);
+    });
+
+    it('filtert reviews zonder tekst uit Playwright resultaten', async () => {
+      const parser = createParser();
+      const mockFetchPw = (parser as any).scraper.fetchWithPlaywright;
+      const mockFetchCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
+      mockFetchPw.mockResolvedValueOnce({
+        html: '<a href="/hotel/nl/test.html">Hotel</a>',
+        status: 200,
+      });
+
+      mockFetchCustom.mockResolvedValueOnce({
+        result: {
+          reviews: [
+            { author: 'Hans', rating: 8.0, positive: 'Goed', date: 'jan 2024' },
+            { author: 'Klaas', rating: 7.0 }, // Geen tekst -> wordt gefilterd
+          ],
+          averageRating: 7.5,
+        },
+        html: '',
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].author).toBe('Hans');
     });
   });
 
@@ -109,7 +188,7 @@ describe('BookingParser', () => {
     });
   });
 
-  describe('extractReviews', () => {
+  describe('extractReviews (HTML fallback)', () => {
     it('parset review-cards met positieve en negatieve tekst', () => {
       const parser = createParser() as any;
       const html = `

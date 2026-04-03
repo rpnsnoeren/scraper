@@ -4,7 +4,7 @@ import { ReviewDiscoveryService, DiscoveredPlatform } from './review-discovery';
 import { getParser } from './review-parsers/index';
 import { CustomerReviewsResponse, PlatformReviews } from '../types/customer-reviews';
 
-const PARSER_TIMEOUT = 45_000;
+const PARSER_TIMEOUT = 60_000;
 const MAX_CONCURRENT = 3;
 
 export class CustomerReviewsOrchestrator {

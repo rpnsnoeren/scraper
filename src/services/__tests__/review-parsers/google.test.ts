@@ -1,10 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { GoogleReviewsParser } from '../../review-parsers/google';
+import { GoogleReviewsParser, PlaywrightExtractedData } from '../../review-parsers/google';
 import { ScraperService } from '../../scraper';
 
 function createParser(): GoogleReviewsParser {
   const mockScraper = {
     fetchWithPlaywright: vi.fn(),
+    fetchWithPlaywrightCustom: vi.fn(),
   } as unknown as ScraperService;
   return new GoogleReviewsParser(mockScraper);
 }
@@ -35,34 +36,112 @@ describe('GoogleReviewsParser', () => {
     });
   });
 
-  describe('parse - zoek naar detail navigatie', () => {
-    it('haalt detail-pagina op als place URL gevonden wordt', async () => {
+  describe('parse - Playwright custom interactie', () => {
+    it('gebruikt fetchWithPlaywrightCustom voor detail-pagina met reviews', async () => {
       const parser = createParser();
       const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
 
       // Eerste call: zoekresultaten met place link
       mockFetch.mockResolvedValueOnce({
         html: '<a href="https://www.google.com/maps/place/Treatwell/data=!123">Treatwell</a>',
         status: 200,
       });
-      // Tweede call: detail-pagina met reviews
+
+      // Tweede call: fetchWithPlaywrightCustom met Playwright-geëxtraheerde data
+      const playwrightResult: PlaywrightExtractedData = {
+        averageRating: 4.5,
+        totalReviews: 100,
+        reviews: [
+          { author: 'Jan', rating: 5, text: 'Geweldige service, echt top!', date: '2 weken geleden' },
+          { author: 'Maria', rating: 4, text: 'Prima ervaring gehad hier', date: '1 maand geleden' },
+        ],
+      };
+      mockCustom.mockResolvedValueOnce({
+        result: playwrightResult,
+        html: '<div>detail page html</div>',
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockCustom).toHaveBeenCalledTimes(1);
+      expect(mockCustom).toHaveBeenCalledWith(
+        'https://www.google.com/maps/place/Treatwell/data=!123',
+        expect.any(Function),
+        60000,
+      );
+      expect(result.averageRating).toBe(4.5);
+      expect(result.totalReviews).toBe(100);
+      expect(result.reviews).toHaveLength(2);
+      expect(result.reviews[0].author).toBe('Jan');
+      expect(result.reviews[1].text).toBe('Prima ervaring gehad hier');
+    });
+
+    it('valt terug op HTML-extractie als Playwright geen reviews vindt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
       mockFetch.mockResolvedValueOnce({
+        html: '<a href="https://www.google.com/maps/place/Test/data=!1">Test</a>',
+        status: 200,
+      });
+
+      // Playwright geeft lege data terug
+      const emptyResult: PlaywrightExtractedData = {
+        reviews: [],
+      };
+      mockCustom.mockResolvedValueOnce({
+        result: emptyResult,
         html: `
-          <span aria-label="4,5 sterren"></span>
-          <span>100 reviews</span>
+          <span aria-label="4,0 sterren"></span>
+          <span>50 reviews</span>
           <div data-review-id="r1">
             <span aria-label="5 sterren"></span>
-            <span class="review-full-text">Top!</span>
+            <span class="review-full-text">Fallback review tekst</span>
           </div>
         `,
         status: 200,
       });
 
-      const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
-      expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(mockFetch).toHaveBeenCalledWith('https://www.google.com/maps/place/Treatwell/data=!123', 20000);
-      expect(result.averageRating).toBe(4.5);
+      const result = await parser.parse('https://www.google.com/maps/search/Test');
+
+      // Moet terugvallen op regex extractie uit HTML
+      expect(result.averageRating).toBe(4.0);
+      expect(result.totalReviews).toBe(50);
       expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].text).toBe('Fallback review tekst');
+    });
+
+    it('valt terug op fetchWithPlaywright als fetchWithPlaywrightCustom faalt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const mockCustom = (parser as any).scraper.fetchWithPlaywrightCustom;
+
+      mockFetch.mockResolvedValueOnce({
+        html: '<a href="https://www.google.com/maps/place/Fout/data=!1">Fout</a>',
+        status: 200,
+      });
+
+      // fetchWithPlaywrightCustom gooit een fout
+      mockCustom.mockRejectedValueOnce(new Error('Playwright timeout'));
+
+      // Fallback: gewone fetchWithPlaywright
+      mockFetch.mockResolvedValueOnce({
+        html: `
+          <span aria-label="3,5 sterren"></span>
+          <span>25 reviews</span>
+        `,
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.google.com/maps/search/Fout');
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.averageRating).toBe(3.5);
+      expect(result.totalReviews).toBe(25);
     });
 
     it('gebruikt zoekresultaat-HTML als geen place URL gevonden wordt', async () => {
@@ -93,6 +172,32 @@ describe('GoogleReviewsParser', () => {
       expect(result.reviews).toHaveLength(0);
       expect(result.averageRating).toBeUndefined();
       expect(result.totalReviews).toBeUndefined();
+    });
+  });
+
+  describe('extractFromHtml - fallback regex extractie', () => {
+    it('extraheert rating, totaal en reviews uit HTML', () => {
+      const parser = createParser();
+      const html = `
+        <span aria-label="4,5 sterren"></span>
+        <span>100 reviews</span>
+        <div data-review-id="r1">
+          <span aria-label="5 sterren"></span>
+          <span class="review-full-text">Top!</span>
+        </div>
+      `;
+      const result = parser.extractFromHtml(html);
+      expect(result.averageRating).toBe(4.5);
+      expect(result.totalReviews).toBe(100);
+      expect(result.reviews).toHaveLength(1);
+    });
+
+    it('geeft leeg resultaat bij lege HTML', () => {
+      const parser = createParser();
+      const result = parser.extractFromHtml('<div>Leeg</div>');
+      expect(result.averageRating).toBeUndefined();
+      expect(result.totalReviews).toBeUndefined();
+      expect(result.reviews).toHaveLength(0);
     });
   });
 
@@ -233,6 +338,118 @@ describe('GoogleReviewsParser', () => {
       `;
       const review = parser.parseReviewBlock(blockHtml);
       expect(review!.date).toBe('1 dag geleden');
+    });
+  });
+
+  describe('extractReviewsWithPlaywright', () => {
+    it('roept de juiste Playwright-interacties aan', async () => {
+      const parser = createParser();
+
+      // Mock een Page object met de benodigde methoden
+      const mockPage = {
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
+        locator: vi.fn().mockReturnValue({
+          first: vi.fn().mockReturnValue({
+            isVisible: vi.fn().mockResolvedValue(false),
+          }),
+        }),
+        evaluate: vi.fn(),
+      };
+
+      // Eerste evaluate calls zijn voor scrolling (6x), laatste is voor data extractie
+      // scrollReviewPanel doet 6 evaluate calls, dan extractReviewsWithPlaywright doet 1
+      const scrollEvalFn = vi.fn().mockResolvedValue(undefined);
+      const extractResult: PlaywrightExtractedData = {
+        averageRating: 4.2,
+        totalReviews: 200,
+        reviews: [
+          { author: 'Test User', rating: 5, text: 'Hele goede ervaring gehad', date: '1 week geleden' },
+        ],
+      };
+
+      // 6 scroll evaluates + 1 data extraction evaluate
+      mockPage.evaluate
+        .mockResolvedValueOnce(undefined) // scroll 1
+        .mockResolvedValueOnce(undefined) // scroll 2
+        .mockResolvedValueOnce(undefined) // scroll 3
+        .mockResolvedValueOnce(undefined) // scroll 4
+        .mockResolvedValueOnce(undefined) // scroll 5
+        .mockResolvedValueOnce(undefined) // scroll 6
+        .mockResolvedValueOnce(extractResult); // data extractie
+
+      const result = await parser.extractReviewsWithPlaywright(mockPage as any);
+
+      // Moet wachten op laden (2x waitForTimeout voor load + tab click wacht)
+      expect(mockPage.waitForTimeout).toHaveBeenCalled();
+      // Moet evaluate aanroepen (6 scroll + 1 data)
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(7);
+      expect(result.averageRating).toBe(4.2);
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].author).toBe('Test User');
+    });
+
+    it('werkt ook als geen reviews tab gevonden wordt', async () => {
+      const parser = createParser();
+
+      const mockPage = {
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
+        locator: vi.fn().mockReturnValue({
+          first: vi.fn().mockReturnValue({
+            isVisible: vi.fn().mockResolvedValue(false),
+          }),
+        }),
+        evaluate: vi.fn(),
+      };
+
+      const emptyResult: PlaywrightExtractedData = {
+        reviews: [],
+      };
+
+      // 6 scroll + 1 data
+      for (let i = 0; i < 6; i++) {
+        mockPage.evaluate.mockResolvedValueOnce(undefined);
+      }
+      mockPage.evaluate.mockResolvedValueOnce(emptyResult);
+
+      const result = await parser.extractReviewsWithPlaywright(mockPage as any);
+
+      expect(result.reviews).toHaveLength(0);
+      expect(result.averageRating).toBeUndefined();
+    });
+
+    it('klikt op reviews tab als deze zichtbaar is', async () => {
+      const parser = createParser();
+
+      const mockClick = vi.fn().mockResolvedValue(undefined);
+      const mockPage = {
+        waitForTimeout: vi.fn().mockResolvedValue(undefined),
+        locator: vi.fn().mockReturnValue({
+          first: vi.fn().mockReturnValue({
+            isVisible: vi.fn().mockResolvedValueOnce(true),
+            click: mockClick,
+          }),
+        }),
+        evaluate: vi.fn(),
+      };
+
+      const extractResult: PlaywrightExtractedData = {
+        averageRating: 3.8,
+        totalReviews: 50,
+        reviews: [
+          { author: 'Piet', rating: 4, text: 'Goede zaak, kan ik aanraden', date: '3 dagen geleden' },
+        ],
+      };
+
+      for (let i = 0; i < 6; i++) {
+        mockPage.evaluate.mockResolvedValueOnce(undefined);
+      }
+      mockPage.evaluate.mockResolvedValueOnce(extractResult);
+
+      const result = await parser.extractReviewsWithPlaywright(mockPage as any);
+
+      // Tab moet aangeklikt zijn
+      expect(mockClick).toHaveBeenCalled();
+      expect(result.reviews).toHaveLength(1);
     });
   });
 });

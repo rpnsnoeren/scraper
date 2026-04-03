@@ -1,5 +1,20 @@
+import { Page } from 'playwright';
 import { Review } from '../../types/customer-reviews';
 import { ReviewParserBase, ParsedReviews } from './base';
+
+/**
+ * Gestructureerde data die page.evaluate() teruggeeft vanuit de browser context.
+ */
+export interface PlaywrightExtractedData {
+  averageRating?: number;
+  totalReviews?: number;
+  reviews: Array<{
+    author?: string;
+    rating?: number;
+    text: string;
+    date?: string;
+  }>;
+}
 
 export class GoogleReviewsParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
@@ -8,17 +23,43 @@ export class GoogleReviewsParser extends ReviewParserBase {
     // Stap 1: Zoek de detail-pagina URL uit de zoekresultaten
     const placeUrl = this.extractPlaceUrl(searchHtml);
 
-    // Stap 2: Als een place URL gevonden is, haal die pagina op
-    let html: string;
+    // Stap 2: Als een place URL gevonden is, gebruik Playwright custom interactie
+    // om reviews te laden via scrollen
     if (placeUrl) {
-      const { html: detailHtml } = await this.scraper.fetchWithPlaywright(placeUrl, 20000);
-      html = detailHtml;
-    } else {
-      // Geen place URL gevonden — Google heeft mogelijk direct doorgestuurd
-      // naar een place pagina (bij exact één resultaat). Gebruik de huidige HTML.
-      html = searchHtml;
+      try {
+        const { result, html: detailHtml } = await this.scraper.fetchWithPlaywrightCustom<PlaywrightExtractedData>(
+          placeUrl,
+          (page) => this.extractReviewsWithPlaywright(page),
+          60000,
+        );
+
+        // Als Playwright data heeft opgeleverd, gebruik die
+        if (result.reviews.length > 0 || result.averageRating !== undefined) {
+          return {
+            averageRating: result.averageRating,
+            totalReviews: result.totalReviews,
+            reviews: this.selectRandom(result.reviews),
+          };
+        }
+
+        // Fallback: probeer regex extractie op de HTML
+        return this.extractFromHtml(detailHtml);
+      } catch {
+        // Bij fout in Playwright custom: fallback naar gewone fetch
+        const { html: detailHtml } = await this.scraper.fetchWithPlaywright(placeUrl, 20000);
+        return this.extractFromHtml(detailHtml);
+      }
     }
 
+    // Geen place URL gevonden — Google heeft mogelijk direct doorgestuurd
+    // naar een place pagina (bij exact één resultaat). Gebruik de huidige HTML.
+    return this.extractFromHtml(searchHtml);
+  }
+
+  /**
+   * Fallback: extraheert reviews uit ruwe HTML met regex patronen.
+   */
+  extractFromHtml(html: string): ParsedReviews {
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -28,6 +69,195 @@ export class GoogleReviewsParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Playwright callback: klikt op de Reviews tab, scrollt het review-paneel,
+   * en extraheert individuele reviews via page.evaluate().
+   */
+  async extractReviewsWithPlaywright(page: Page): Promise<PlaywrightExtractedData> {
+    // Wacht tot de pagina geladen is
+    await page.waitForTimeout(2000);
+
+    // Klik op de Reviews tab als die zichtbaar is
+    await this.clickReviewsTab(page);
+
+    // Wacht tot review-elementen verschijnen
+    await page.waitForTimeout(2000);
+
+    // Scroll het review-paneel 5-8 keer om meer reviews te laden
+    await this.scrollReviewPanel(page);
+
+    // Extraheer alle data uit de DOM
+    const data = await page.evaluate(() => {
+      const result: {
+        averageRating?: number;
+        totalReviews?: number;
+        reviews: Array<{
+          author?: string;
+          rating?: number;
+          text: string;
+          date?: string;
+        }>;
+      } = { reviews: [] };
+
+      // Gemiddelde rating: zoek aria-label met sterren/stars
+      const ratingEl = document.querySelector('[aria-label*="sterren"],[aria-label*="stars"]');
+      if (ratingEl) {
+        const label = ratingEl.getAttribute('aria-label') || '';
+        const match = label.match(/([\d.,]+)\s*(?:sterren|stars?)/i);
+        if (match) {
+          result.averageRating = parseFloat(match[1].replace(',', '.'));
+        }
+      }
+
+      // Totaal reviews: zoek tekst met "reviews" of "beoordelingen"
+      const allElements = document.querySelectorAll('*');
+      for (const el of allElements) {
+        if (el.children.length > 0) continue; // Alleen bladnodes
+        const text = (el.textContent || '').trim();
+        const countMatch = text.match(/([\d.,]+)\s*(?:reviews?|beoordelingen|ratings?)/i);
+        if (countMatch) {
+          const cleaned = countMatch[1].replace(/\./g, '').replace(/,/g, '');
+          const num = parseInt(cleaned, 10);
+          if (!isNaN(num) && num > 0) {
+            result.totalReviews = num;
+            break;
+          }
+        }
+      }
+
+      // Individuele reviews: zoek elementen met data-review-id
+      const reviewBlocks = document.querySelectorAll('[data-review-id]');
+      for (const block of reviewBlocks) {
+        // Rating uit aria-label
+        let rating: number | undefined;
+        const starEl = block.querySelector('[aria-label*="sterren"],[aria-label*="stars"],[aria-label*="star"]');
+        if (starEl) {
+          const starLabel = starEl.getAttribute('aria-label') || '';
+          const starMatch = starLabel.match(/(\d+)\s*(?:sterren|stars?)/i);
+          if (starMatch) {
+            rating = parseInt(starMatch[1], 10);
+          }
+        }
+
+        // Tekst: zoek de langste tekst-span in het blok
+        let text = '';
+        const spans = block.querySelectorAll('span');
+        for (const span of spans) {
+          const spanText = (span.textContent || '').trim();
+          // Filter korte teksten en datums
+          if (spanText.length > text.length && spanText.length > 10) {
+            text = spanText;
+          }
+        }
+
+        // Als geen tekst gevonden, sla over
+        if (!text) continue;
+
+        // Auteur: zoek aria-label met "Foto van" of "Photo of"
+        let author: string | undefined;
+        const authorEl = block.querySelector('[aria-label*="Foto van"],[aria-label*="Photo of"]');
+        if (authorEl) {
+          const authorLabel = authorEl.getAttribute('aria-label') || '';
+          const authorMatch = authorLabel.match(/(?:Foto van|Photo of)\s+(.+)/i);
+          if (authorMatch) {
+            author = authorMatch[1].trim();
+          }
+        }
+        // Fallback: zoek auteursnaam via button of link met aria-label
+        if (!author) {
+          const nameEl = block.querySelector('button[aria-label],a[aria-label]');
+          if (nameEl) {
+            const nameLabel = nameEl.getAttribute('aria-label') || '';
+            if (nameLabel && nameLabel.length < 50 && !nameLabel.match(/sterren|stars?|foto|photo/i)) {
+              author = nameLabel.trim();
+            }
+          }
+        }
+
+        // Datum: relatieve datums
+        let date: string | undefined;
+        for (const span of spans) {
+          const spanText = (span.textContent || '').trim();
+          if (spanText.match(/\d+\s+(?:dag|dagen|week|weken|maand|maanden|jaar|jaren|day|days|weeks?|months?|years?)\s+(?:geleden|ago)/i)) {
+            date = spanText;
+            break;
+          }
+        }
+
+        result.reviews.push({ author, rating, text, date });
+      }
+
+      return result;
+    });
+
+    return data;
+  }
+
+  /**
+   * Klikt op de Reviews/Beoordelingen tab in Google Maps.
+   */
+  private async clickReviewsTab(page: Page): Promise<void> {
+    const tabSelectors = [
+      'button[role="tab"]:has-text("Reviews")',
+      'button[role="tab"]:has-text("Beoordelingen")',
+      'button[role="tab"]:has-text("reviews")',
+      'button[role="tab"]:has-text("beoordelingen")',
+      '[role="tab"]:has-text("Reviews")',
+      '[role="tab"]:has-text("Beoordelingen")',
+    ];
+
+    for (const selector of tabSelectors) {
+      try {
+        const tab = page.locator(selector).first();
+        if (await tab.isVisible({ timeout: 1000 })) {
+          await tab.click();
+          await page.waitForTimeout(1500);
+          return;
+        }
+      } catch {
+        // Tab niet gevonden, volgende proberen
+      }
+    }
+  }
+
+  /**
+   * Scrollt het review-paneel in Google Maps om meer reviews te laden.
+   * Google Maps gebruikt een scrollbaar paneel, niet de hele pagina.
+   */
+  private async scrollReviewPanel(page: Page): Promise<void> {
+    const scrollCount = 6; // 5-8 keer scrollen
+
+    for (let i = 0; i < scrollCount; i++) {
+      await page.evaluate(() => {
+        // Zoek het scrollbare paneel — Google Maps heeft een scrollbare container
+        // Probeer meerdere selectors
+        const selectors = [
+          '[role="main"]',
+          '.section-layout.section-scrollbox',
+          'div[tabindex="-1"]',
+          '.m6QErb.DxyBCb.kA9KIf.dS8AEf',
+        ];
+
+        let scrollContainer: Element | null = null;
+        for (const sel of selectors) {
+          const el = document.querySelector(sel);
+          if (el && el.scrollHeight > el.clientHeight) {
+            scrollContainer = el;
+            break;
+          }
+        }
+
+        if (scrollContainer) {
+          scrollContainer.scrollTop += 1000;
+        } else {
+          // Fallback: scroll de hele pagina
+          window.scrollBy(0, 1000);
+        }
+      });
+      await page.waitForTimeout(1000);
+    }
   }
 
   /**
