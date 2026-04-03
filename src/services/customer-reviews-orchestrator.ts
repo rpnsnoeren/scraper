@@ -15,7 +15,7 @@ export class CustomerReviewsOrchestrator {
   constructor(cache: CacheService, scraper: ScraperService) {
     this.cache = cache;
     this.scraper = scraper;
-    this.discovery = new ReviewDiscoveryService(scraper);
+    this.discovery = new ReviewDiscoveryService();
   }
 
   async scrape(businessName: string, domain?: string): Promise<CustomerReviewsResponse> {
@@ -27,25 +27,13 @@ export class CustomerReviewsOrchestrator {
       return { ...cached, cached: true };
     }
 
-    // Discover platforms
-    console.log(`[CustomerReviews] Discovering review platforms for "${businessName}"...`);
-    const discoveredPlatforms = await this.discovery.discover(businessName, domain);
-    console.log(`[CustomerReviews] Found ${discoveredPlatforms.length} platforms`);
-
-    if (discoveredPlatforms.length === 0) {
-      const emptyResponse: CustomerReviewsResponse = {
-        businessName,
-        domain,
-        platforms: [],
-        cached: false,
-        scrapedAt: new Date().toISOString(),
-      };
-      await this.cache.set(cacheKey, emptyResponse);
-      return emptyResponse;
-    }
+    // Bouw URLs voor alle platforms en probeer ze allemaal
+    const platformUrls = this.discovery.buildPlatformUrls(businessName, domain);
+    console.log(`[CustomerReviews] Trying ${platformUrls.length} platforms for "${businessName}"...`);
 
     // Parse reviews from each platform with concurrency limit
-    const platforms = await this.parseWithConcurrency(discoveredPlatforms, MAX_CONCURRENT);
+    const platforms = await this.parseWithConcurrency(platformUrls, MAX_CONCURRENT);
+    console.log(`[CustomerReviews] ${platforms.length} platforms returned reviews`);
 
     const response: CustomerReviewsResponse = {
       businessName,

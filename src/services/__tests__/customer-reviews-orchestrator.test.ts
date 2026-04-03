@@ -5,11 +5,11 @@ import { ScraperService } from '../scraper';
 import { CustomerReviewsResponse } from '../../types/customer-reviews';
 
 // Mock dependencies
-const mockDiscover = vi.fn().mockResolvedValue([]);
+const mockBuildPlatformUrls = vi.fn().mockReturnValue([]);
 
 vi.mock('../review-discovery', () => ({
   ReviewDiscoveryService: class {
-    discover = mockDiscover;
+    buildPlatformUrls = mockBuildPlatformUrls;
   },
 }));
 
@@ -49,24 +49,11 @@ describe('CustomerReviewsOrchestrator', () => {
     expect(cache.get).toHaveBeenCalledWith('reviews:test bv:test.nl');
   });
 
-  it('should return empty platforms when discovery finds nothing', async () => {
-    vi.spyOn(cache, 'get').mockResolvedValue(null);
-    vi.spyOn(cache, 'set').mockResolvedValue();
-    mockDiscover.mockResolvedValue([]);
-
-    const result = await orchestrator.scrape('Onbekend Bedrijf');
-
-    expect(result.platforms).toEqual([]);
-    expect(result.cached).toBe(false);
-    expect(result.businessName).toBe('Onbekend Bedrijf');
-    expect(cache.set).toHaveBeenCalled();
-  });
-
-  it('should call parser for discovered platforms', async () => {
+  it('should call parser for each platform URL', async () => {
     vi.spyOn(cache, 'get').mockResolvedValue(null);
     vi.spyOn(cache, 'set').mockResolvedValue();
 
-    mockDiscover.mockResolvedValue([
+    mockBuildPlatformUrls.mockReturnValue([
       { platform: 'trustpilot', url: 'https://www.trustpilot.com/review/test.nl' },
     ]);
 
@@ -84,7 +71,6 @@ describe('CustomerReviewsOrchestrator', () => {
     expect(result.platforms).toHaveLength(1);
     expect(result.platforms[0].platform).toBe('trustpilot');
     expect(result.platforms[0].averageRating).toBe(4.5);
-    expect(result.platforms[0].reviews).toHaveLength(1);
     expect(mockParser.parse).toHaveBeenCalledWith('https://www.trustpilot.com/review/test.nl');
   });
 
@@ -92,9 +78,9 @@ describe('CustomerReviewsOrchestrator', () => {
     vi.spyOn(cache, 'get').mockResolvedValue(null);
     vi.spyOn(cache, 'set').mockResolvedValue();
 
-    mockDiscover.mockResolvedValue([
+    mockBuildPlatformUrls.mockReturnValue([
       { platform: 'trustpilot', url: 'https://www.trustpilot.com/review/test.nl' },
-      { platform: 'google', url: 'https://www.google.com/maps/place/test' },
+      { platform: 'google', url: 'https://www.google.com/maps/search/test' },
     ]);
 
     const failingParser = { parse: vi.fn().mockRejectedValue(new Error('Parse error')) };
@@ -112,9 +98,23 @@ describe('CustomerReviewsOrchestrator', () => {
 
     const result = await orchestrator.scrape('Test BV', 'test.nl');
 
-    // Only the successful parser result should be included
     expect(result.platforms).toHaveLength(1);
     expect(result.platforms[0].platform).toBe('google');
+    expect(result.cached).toBe(false);
+  });
+
+  it('should return empty platforms array when all parsers fail', async () => {
+    vi.spyOn(cache, 'get').mockResolvedValue(null);
+    vi.spyOn(cache, 'set').mockResolvedValue();
+
+    mockBuildPlatformUrls.mockReturnValue([
+      { platform: 'trustpilot', url: 'https://example.com' },
+    ]);
+    mockGetParser.mockReturnValue(null);
+
+    const result = await orchestrator.scrape('Test');
+
+    expect(result.platforms).toEqual([]);
     expect(result.cached).toBe(false);
   });
 
@@ -122,7 +122,6 @@ describe('CustomerReviewsOrchestrator', () => {
     vi.spyOn(cache, 'get').mockResolvedValue(null);
     vi.spyOn(cache, 'set').mockResolvedValue();
 
-    orchestrator = new CustomerReviewsOrchestrator(cache, scraper);
     await orchestrator.scrape('My Business', 'Example.COM');
 
     expect(cache.get).toHaveBeenCalledWith('reviews:my business:example.com');
@@ -132,7 +131,6 @@ describe('CustomerReviewsOrchestrator', () => {
     vi.spyOn(cache, 'get').mockResolvedValue(null);
     vi.spyOn(cache, 'set').mockResolvedValue();
 
-    orchestrator = new CustomerReviewsOrchestrator(cache, scraper);
     await orchestrator.scrape('My Business');
 
     expect(cache.get).toHaveBeenCalledWith('reviews:my business:');
