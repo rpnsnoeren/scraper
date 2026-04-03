@@ -68,53 +68,62 @@ export class GoogleReviewsParser extends ReviewParserBase {
     // Wacht tot de pagina geladen is
     await page.waitForTimeout(2000);
 
+    // Extraheer rating en total VÓÓR de tab-klik (staan op Overzicht tab)
+    const meta = await page.evaluate(() => {
+      let averageRating: number | undefined;
+      let totalReviews: number | undefined;
+
+      // Rating: span.fontDisplayLarge of span.MW4etd
+      const bigRating = document.querySelector('span.fontDisplayLarge');
+      if (bigRating) {
+        const val = parseFloat((bigRating.textContent || '').replace(',', '.').trim());
+        if (!isNaN(val) && val >= 0 && val <= 5) averageRating = val;
+      }
+      if (averageRating == null) {
+        const smallRating = document.querySelector('span.MW4etd');
+        if (smallRating) {
+          const val = parseFloat((smallRating.textContent || '').replace(',', '.').trim());
+          if (!isNaN(val) && val >= 0 && val <= 5) averageRating = val;
+        }
+      }
+
+      // Total reviews: zoek "(7)" patroon naast de rating
+      const bodyText = document.body.innerText;
+      const countMatch = bodyText.match(/\((\d+)\)/);
+      if (countMatch) {
+        const num = parseInt(countMatch[1], 10);
+        if (!isNaN(num) && num > 0 && num < 100000) totalReviews = num;
+      }
+      // Fallback: "X reviews" of "X beoordelingen"
+      if (totalReviews == null) {
+        const reviewMatch = bodyText.match(/([\d.,]+)\s*(?:reviews?|beoordelingen)/i);
+        if (reviewMatch) {
+          const cleaned = reviewMatch[1].replace(/\./g, '').replace(/,/g, '');
+          const num = parseInt(cleaned, 10);
+          if (!isNaN(num) && num > 0) totalReviews = num;
+        }
+      }
+
+      return { averageRating, totalReviews };
+    });
+
     // Klik op de Reviews tab als die zichtbaar is
     await this.clickReviewsTab(page);
 
     // Wacht tot review-elementen verschijnen
     await page.waitForTimeout(2000);
 
-    // Scroll het review-paneel 5-8 keer om meer reviews te laden
+    // Scroll het review-paneel om meer reviews te laden
     await this.scrollReviewPanel(page);
 
-    // Extraheer alle data uit de DOM
-    const data = await page.evaluate(() => {
-      const result: {
-        averageRating?: number;
-        totalReviews?: number;
-        reviews: Array<{
-          author?: string;
-          rating?: number;
-          text: string;
-          date?: string;
-        }>;
-      } = { reviews: [] };
-
-      // Gemiddelde rating: zoek aria-label met sterren/stars
-      const ratingEl = document.querySelector('[aria-label*="sterren"],[aria-label*="stars"]');
-      if (ratingEl) {
-        const label = ratingEl.getAttribute('aria-label') || '';
-        const match = label.match(/([\d.,]+)\s*(?:sterren|stars?)/i);
-        if (match) {
-          result.averageRating = parseFloat(match[1].replace(',', '.'));
-        }
-      }
-
-      // Totaal reviews: zoek tekst met "reviews" of "beoordelingen"
-      const allElements = document.querySelectorAll('*');
-      for (const el of allElements) {
-        if (el.children.length > 0) continue; // Alleen bladnodes
-        const text = (el.textContent || '').trim();
-        const countMatch = text.match(/([\d.,]+)\s*(?:reviews?|beoordelingen|ratings?)/i);
-        if (countMatch) {
-          const cleaned = countMatch[1].replace(/\./g, '').replace(/,/g, '');
-          const num = parseInt(cleaned, 10);
-          if (!isNaN(num) && num > 0) {
-            result.totalReviews = num;
-            break;
-          }
-        }
-      }
+    // Extraheer individuele reviews uit de DOM (na tab-klik en scroll)
+    const reviews = await page.evaluate(() => {
+      const result: Array<{
+        author?: string;
+        rating?: number;
+        text: string;
+        date?: string;
+      }> = [];
 
       // Individuele reviews: zoek top-level elementen met data-review-id en aria-label (auteursnaam)
       // Google Maps heeft geneste data-review-id's — filter op degenen met aria-label (= de review container)
@@ -166,13 +175,17 @@ export class GoogleReviewsParser extends ReviewParserBase {
           }
         }
 
-        result.reviews.push({ author, rating, text, date });
+        result.push({ author, rating, text, date });
       }
 
       return result;
     });
 
-    return data;
+    return {
+      averageRating: meta.averageRating,
+      totalReviews: meta.totalReviews,
+      reviews,
+    };
   }
 
   /**

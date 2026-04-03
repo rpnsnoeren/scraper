@@ -35,9 +35,11 @@ export class CustomerReviewsOrchestrator {
     const allPlatforms = await this.parseWithConcurrency(platformUrls, MAX_CONCURRENT);
 
     // Filter platforms die geen relevante data hebben
-    // Een platform zonder reviews EN zonder totalReviews is waarschijnlijk niet relevant
+    // Een platform is relevant als het individuele reviews heeft,
+    // of een totalReviews + averageRating combinatie (bevestigt dat het bedrijf daar staat)
     const platforms = allPlatforms.filter(p =>
-      p.reviews.length > 0 || (p.totalReviews != null && p.totalReviews > 0)
+      p.reviews.length > 0 ||
+      (p.totalReviews != null && p.totalReviews > 0 && p.averageRating != null)
     );
     console.log(`[CustomerReviews] ${platforms.length}/${allPlatforms.length} platforms met relevante data`);
 

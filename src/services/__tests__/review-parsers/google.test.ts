@@ -314,34 +314,26 @@ describe('GoogleReviewsParser', () => {
         evaluate: vi.fn(),
       };
 
-      // Eerste evaluate calls zijn voor scrolling (6x), laatste is voor data extractie
-      // scrollReviewPanel doet 6 evaluate calls, dan extractReviewsWithPlaywright doet 1
-      const scrollEvalFn = vi.fn().mockResolvedValue(undefined);
-      const extractResult: PlaywrightExtractedData = {
-        averageRating: 4.2,
-        totalReviews: 200,
-        reviews: [
-          { author: 'Test User', rating: 5, text: 'Hele goede ervaring gehad', date: '1 week geleden' },
-        ],
-      };
-
-      // 6 scroll evaluates + 1 data extraction evaluate
+      // 1 meta evaluate + 6 scroll evaluates + 1 reviews extraction
       mockPage.evaluate
+        .mockResolvedValueOnce({ averageRating: 4.2, totalReviews: 200 }) // meta
         .mockResolvedValueOnce(undefined) // scroll 1
         .mockResolvedValueOnce(undefined) // scroll 2
         .mockResolvedValueOnce(undefined) // scroll 3
         .mockResolvedValueOnce(undefined) // scroll 4
         .mockResolvedValueOnce(undefined) // scroll 5
         .mockResolvedValueOnce(undefined) // scroll 6
-        .mockResolvedValueOnce(extractResult); // data extractie
+        .mockResolvedValueOnce([ // reviews
+          { author: 'Test User', rating: 5, text: 'Hele goede ervaring gehad', date: '1 week geleden' },
+        ]);
 
       const result = await parser.extractReviewsWithPlaywright(mockPage as any);
 
-      // Moet wachten op laden (2x waitForTimeout voor load + tab click wacht)
       expect(mockPage.waitForTimeout).toHaveBeenCalled();
-      // Moet evaluate aanroepen (6 scroll + 1 data)
-      expect(mockPage.evaluate).toHaveBeenCalledTimes(7);
+      // 1 meta + 6 scroll + 1 reviews = 8
+      expect(mockPage.evaluate).toHaveBeenCalledTimes(8);
       expect(result.averageRating).toBe(4.2);
+      expect(result.totalReviews).toBe(200);
       expect(result.reviews).toHaveLength(1);
       expect(result.reviews[0].author).toBe('Test User');
     });
@@ -359,15 +351,13 @@ describe('GoogleReviewsParser', () => {
         evaluate: vi.fn(),
       };
 
-      const emptyResult: PlaywrightExtractedData = {
-        reviews: [],
-      };
-
-      // 6 scroll + 1 data
+      // 1 meta + 6 scroll + 1 reviews = 8
+      mockPage.evaluate
+        .mockResolvedValueOnce({ averageRating: undefined, totalReviews: undefined }) // meta
       for (let i = 0; i < 6; i++) {
-        mockPage.evaluate.mockResolvedValueOnce(undefined);
+        mockPage.evaluate.mockResolvedValueOnce(undefined); // scroll
       }
-      mockPage.evaluate.mockResolvedValueOnce(emptyResult);
+      mockPage.evaluate.mockResolvedValueOnce([]); // reviews
 
       const result = await parser.extractReviewsWithPlaywright(mockPage as any);
 
@@ -390,18 +380,15 @@ describe('GoogleReviewsParser', () => {
         evaluate: vi.fn(),
       };
 
-      const extractResult: PlaywrightExtractedData = {
-        averageRating: 3.8,
-        totalReviews: 50,
-        reviews: [
-          { author: 'Piet', rating: 4, text: 'Goede zaak, kan ik aanraden', date: '3 dagen geleden' },
-        ],
-      };
-
+      // 1 meta + 6 scroll + 1 reviews = 8
+      mockPage.evaluate
+        .mockResolvedValueOnce({ averageRating: 3.8, totalReviews: 50 }); // meta
       for (let i = 0; i < 6; i++) {
-        mockPage.evaluate.mockResolvedValueOnce(undefined);
+        mockPage.evaluate.mockResolvedValueOnce(undefined); // scroll
       }
-      mockPage.evaluate.mockResolvedValueOnce(extractResult);
+      mockPage.evaluate.mockResolvedValueOnce([ // reviews
+        { author: 'Piet', rating: 4, text: 'Goede zaak, kan ik aanraden', date: '3 dagen geleden' },
+      ]);
 
       const result = await parser.extractReviewsWithPlaywright(mockPage as any);
 
