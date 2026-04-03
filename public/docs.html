@@ -921,6 +921,158 @@
         </div>
       </div>
 
+      <!-- POST /api/customer-reviews -->
+      <div class="endpoint" id="endpoint-customer-reviews">
+        <div class="endpoint-header" onclick="toggleEndpoint('endpoint-customer-reviews')">
+          <span class="method post">POST</span>
+          <span class="endpoint-path">/api/customer-reviews</span>
+          <span class="endpoint-desc">Scrape klantreviews van meerdere platforms</span>
+          <span class="expand-icon">▼</span>
+        </div>
+        <div class="endpoint-body">
+          <p>Ontdekt automatisch op welke reviewplatforms een bedrijf vermeld staat en haalt per platform de gemiddelde rating, totaal aantal reviews en max 10 recente reviews op. Timeout: max 120 seconden. Als een platform niet gevonden wordt, wordt het overgeslagen.</p>
+
+          <h3>Request Parameters</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>businessName</code> <span class="required">*required</span></td>
+                <td><code>string</code></td>
+                <td>De naam van het bedrijf (bijv. "Kapper Amsterdam")</td>
+              </tr>
+              <tr>
+                <td><code>domain</code> <span class="optional">optional</span></td>
+                <td><code>string</code></td>
+                <td>Het domein van het bedrijf (bijv. "kapper.nl"). Helpt bij het vinden van het juiste bedrijf op reviewplatforms.</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Request Body</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"businessName"</span>: <span class="json-string">"Kapper Amsterdam"</span>,
+  <span class="json-key">"domain"</span>: <span class="json-string">"kapper.nl"</span>
+}</code></pre>
+          </div>
+
+          <h3>cURL Command</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre id="curlCustomerReviews"><code></code></pre>
+          </div>
+
+          <h3>Response (200 OK)</h3>
+          <div class="code-block">
+            <button class="copy-btn" onclick="copyCode(this)">Kopieer</button>
+            <pre><code>{
+  <span class="json-key">"businessName"</span>: <span class="json-string">"Kapper Amsterdam"</span>,
+  <span class="json-key">"domain"</span>: <span class="json-string">"kapper.nl"</span>,
+  <span class="json-key">"platforms"</span>: [
+    {
+      <span class="json-key">"platform"</span>: <span class="json-string">"trustpilot"</span>,
+      <span class="json-key">"url"</span>: <span class="json-string">"https://www.trustpilot.com/review/kapper.nl"</span>,
+      <span class="json-key">"averageRating"</span>: <span class="json-number">4.3</span>,
+      <span class="json-key">"totalReviews"</span>: <span class="json-number">156</span>,
+      <span class="json-key">"reviews"</span>: [
+        {
+          <span class="json-key">"author"</span>: <span class="json-string">"Jan Jansen"</span>,
+          <span class="json-key">"rating"</span>: <span class="json-number">5</span>,
+          <span class="json-key">"text"</span>: <span class="json-string">"Geweldige service!"</span>,
+          <span class="json-key">"date"</span>: <span class="json-string">"2026-03-15"</span>
+        }
+      ]
+    }
+  ],
+  <span class="json-key">"cached"</span>: <span class="json-boolean">false</span>,
+  <span class="json-key">"scrapedAt"</span>: <span class="json-string">"2026-04-03T10:00:00.000Z"</span>
+}</code></pre>
+          </div>
+
+          <h3>Platform Object</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Veld</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>platform</code></td>
+                <td><code>string</code></td>
+                <td>Naam van het reviewplatform (bijv. "trustpilot", "google", "tripadvisor")</td>
+              </tr>
+              <tr>
+                <td><code>url</code></td>
+                <td><code>string</code></td>
+                <td>Directe link naar de bedrijfspagina op het platform</td>
+              </tr>
+              <tr>
+                <td><code>averageRating</code></td>
+                <td><code>number</code></td>
+                <td>Gemiddelde rating (1-5)</td>
+              </tr>
+              <tr>
+                <td><code>totalReviews</code></td>
+                <td><code>number</code></td>
+                <td>Totaal aantal reviews op het platform</td>
+              </tr>
+              <tr>
+                <td><code>reviews</code></td>
+                <td><code>Review[]</code></td>
+                <td>Lijst van max 10 recente reviews</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Review Object</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Veld</th>
+                <th>Type</th>
+                <th>Beschrijving</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>author</code></td>
+                <td><code>string</code></td>
+                <td>Naam van de reviewer</td>
+              </tr>
+              <tr>
+                <td><code>rating</code></td>
+                <td><code>number</code></td>
+                <td>Rating gegeven door de reviewer (1-5)</td>
+              </tr>
+              <tr>
+                <td><code>text</code></td>
+                <td><code>string</code></td>
+                <td>Tekst van de review</td>
+              </tr>
+              <tr>
+                <td><code>date</code></td>
+                <td><code>string</code></td>
+                <td>Datum van de review (YYYY-MM-DD)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>Ondersteunde Platforms</h3>
+          <p>Google Reviews, Trustpilot, Tripadvisor, Treatwell, Booking.com, Expedia, Yelp</p>
+        </div>
+      </div>
+
       <!-- GET /health -->
       <div class="endpoint" id="endpoint-health">
         <div class="endpoint-header" onclick="toggleEndpoint('endpoint-health')">
@@ -1252,6 +1404,11 @@
   <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
   <span class="curl-flag">-H</span> <span class="json-string">"Authorization: Bearer YOUR_API_KEY"</span> \\
   <span class="curl-flag">-d</span> <span class="json-string">'{"accountOwner": "Microsoft"}'</span></code>`;
+
+    document.getElementById('curlCustomerReviews').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-flag">-X POST</span> <span class="curl-url">"${API_URL}/api/customer-reviews"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Content-Type: application/json"</span> \\
+  <span class="curl-flag">-H</span> <span class="json-string">"Authorization: Bearer YOUR_API_KEY"</span> \\
+  <span class="curl-flag">-d</span> <span class="json-string">'{"businessName": "Kapper Amsterdam", "domain": "kapper.nl"}'</span></code>`;
 
     document.getElementById('curlHealth').innerHTML = `<code><span class="curl-command">curl</span> <span class="curl-url">"${API_URL}/health"</span></code>`;
 

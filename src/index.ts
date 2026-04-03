@@ -9,9 +9,11 @@ import { scrapeRoutes } from './routes/scrape';
 import { chatsyncRoutes } from './routes/chatsync';
 import { googleAdsRoutes } from './routes/google-ads';
 import { linkedInAdsRoutes } from './routes/linkedin-ads';
+import { customerReviewsRoutes } from './routes/customer-reviews';
 import { ChatSyncOrchestrator } from './services/chatsync-orchestrator';
 import { GoogleAdsOrchestrator } from './services/google-ads-orchestrator';
 import { LinkedInAdsOrchestrator } from './services/linkedin-ads-orchestrator';
+import { CustomerReviewsOrchestrator } from './services/customer-reviews-orchestrator';
 import { CacheService } from './services/cache';
 import { ScraperService } from './services/scraper';
 import { DiscoveryService } from './services/discovery';
@@ -48,12 +50,14 @@ async function main() {
   const chatsyncOrchestrator = new ChatSyncOrchestrator(cache, scraper, discovery);
   const googleAdsOrchestrator = new GoogleAdsOrchestrator(cache);
   const linkedInAdsOrchestrator = new LinkedInAdsOrchestrator(cache, scraper);
+  const customerReviewsOrchestrator = new CustomerReviewsOrchestrator(cache, scraper);
 
   // Register routes
   await scrapeRoutes(fastify, orchestrator);
   await chatsyncRoutes(fastify, chatsyncOrchestrator);
   await googleAdsRoutes(fastify, googleAdsOrchestrator);
   await linkedInAdsRoutes(fastify, linkedInAdsOrchestrator);
+  await customerReviewsRoutes(fastify, customerReviewsOrchestrator);
 
   // Serve docs page
   fastify.get('/docs', async (request, reply) => {

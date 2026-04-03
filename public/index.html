@@ -452,6 +452,11 @@
     .scraper-panel.active {
       display: block;
     }
+
+    .review-stars {
+      color: #fbbf24;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -476,6 +481,10 @@
       <button class="scraper-tab" data-scraper="linkedinads" onclick="selectScraper('linkedinads')">
         <span class="icon">💼</span>
         <span>LinkedIn Ads</span>
+      </button>
+      <button class="scraper-tab" data-scraper="customerreviews" onclick="selectScraper('customerreviews')">
+        <span class="icon">⭐</span>
+        <span>Reviews</span>
       </button>
       <button class="scraper-tab disabled" data-scraper="company" onclick="selectScraper('company')">
         <span class="icon">🏢</span>
@@ -625,6 +634,34 @@
       </div>
     </div>
 
+    <!-- Customer Reviews Scraper Panel -->
+    <div id="panel-customerreviews" class="scraper-panel">
+      <div class="scraper-description">
+        Scrape klantreviews van Google, Trustpilot en andere platforms. Bekijk beoordelingen, gemiddelde scores en individuele reviews.
+      </div>
+
+      <div class="card">
+        <div class="api-key-group">
+          <label for="crApiKey">API Key:</label>
+          <input type="text" id="crApiKey" value="test123" placeholder="Je API key">
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="crBusinessName" placeholder="bijv. Kapper Amsterdam">
+          <button id="crScrapeBtn" onclick="reviewsScrape()">Scrape</button>
+        </div>
+
+        <div class="form-group">
+          <input type="text" id="crDomain" placeholder="bijv. kapper.nl (optioneel)">
+        </div>
+
+        <div id="crCurlSection" class="curl-box output-box">
+          <button class="copy-btn" onclick="copyCrCurl()">Kopieer</button>
+          <pre id="crCurlCommand"></pre>
+        </div>
+      </div>
+    </div>
+
     <!-- Company Info Scraper Panel (Coming Soon) -->
     <div id="panel-company" class="scraper-panel">
       <div class="scraper-description">
@@ -707,6 +744,11 @@
       linkedinads: {
         endpoint: '/api/linkedin-ads',
         name: 'LinkedIn Ads',
+        enabled: true
+      },
+      customerreviews: {
+        endpoint: '/api/customer-reviews',
+        name: 'Reviews',
         enabled: true
       },
       company: {
@@ -1463,6 +1505,185 @@
 
     // Init LinkedIn Ads curl preview
     updateLinkedInAdsCurl();
+
+    // === Customer Reviews Functions ===
+
+    document.getElementById('crBusinessName').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') reviewsScrape();
+    });
+    document.getElementById('crBusinessName').addEventListener('input', updateReviewsCurl);
+    document.getElementById('crDomain').addEventListener('input', updateReviewsCurl);
+    document.getElementById('crApiKey').addEventListener('input', updateReviewsCurl);
+
+    function generateReviewsCurl(businessName, domain, apiKey) {
+      const bodyObj = domain
+        ? `{"businessName": "${businessName}", "domain": "${domain}"}`
+        : `{"businessName": "${businessName}"}`;
+      return `curl -X POST "${API_URL}/api/customer-reviews" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKey}" \\
+  -d '${bodyObj}'`;
+    }
+
+    function updateReviewsCurl() {
+      const businessName = document.getElementById('crBusinessName').value.trim() || 'Kapper Amsterdam';
+      const domain = document.getElementById('crDomain').value.trim();
+      const apiKey = document.getElementById('crApiKey').value.trim() || 'YOUR_API_KEY';
+      const curl = generateReviewsCurl(businessName, domain, apiKey);
+      document.getElementById('crCurlCommand').textContent = curl;
+      document.getElementById('crCurlSection').classList.add('show');
+    }
+
+    function copyCrCurl() {
+      const curl = document.getElementById('crCurlCommand').textContent;
+      copyToClipboard(curl, event.target);
+    }
+
+    async function reviewsScrape() {
+      const businessName = document.getElementById('crBusinessName').value.trim();
+      const domain = document.getElementById('crDomain').value.trim();
+      const apiKey = document.getElementById('crApiKey').value.trim();
+
+      if (!businessName) {
+        showStatus('Voer een bedrijfsnaam in', 'error');
+        return;
+      }
+
+      lastDomain = businessName;
+      lastApiKey = apiKey;
+
+      const btn = document.getElementById('crScrapeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Scraping...';
+
+      showStatus(`Bezig met ophalen van reviews voor "${businessName}"... Dit kan even duren.`, 'loading');
+      document.getElementById('results').classList.remove('show');
+
+      try {
+        const body = { businessName };
+        if (domain) body.domain = domain;
+
+        const response = await fetch(`${API_URL}/api/customer-reviews`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify(body)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Reviews scrape mislukt');
+        }
+
+        const platformCount = data.platforms ? data.platforms.length : 0;
+        const totalReviews = data.platforms ? data.platforms.reduce((sum, p) => sum + (p.totalReviews || 0), 0) : 0;
+        showStatus(`Gevonden: ${totalReviews} review(s) op ${platformCount} platform(s) voor "${data.businessName}"`, 'success');
+        showReviewsResults(data);
+      } catch (error) {
+        showStatus(error.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scrape';
+      }
+    }
+
+    function renderStars(rating, max) {
+      max = max || 5;
+      const full = Math.floor(rating);
+      const half = rating - full >= 0.5 ? 1 : 0;
+      const empty = max - full - half;
+      return '\u2605'.repeat(full) + (half ? '\u00BD' : '') + '\u2606'.repeat(empty);
+    }
+
+    function showReviewsResults(data) {
+      document.getElementById('results').classList.add('show');
+
+      const platformCount = data.platforms ? data.platforms.length : 0;
+      const totalReviews = data.platforms ? data.platforms.reduce((sum, p) => sum + (p.totalReviews || 0), 0) : 0;
+
+      document.getElementById('meta').innerHTML = `
+        <div class="meta-item">
+          <span>Bedrijf</span>
+          <strong>${escapeHtml(data.businessName)}</strong>
+        </div>
+        ${data.domain ? `
+        <div class="meta-item">
+          <span>Domein</span>
+          <strong>${escapeHtml(data.domain)}</strong>
+        </div>
+        ` : ''}
+        <div class="meta-item">
+          <span>Platforms</span>
+          <strong>${platformCount}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Totaal reviews</span>
+          <strong>${totalReviews.toLocaleString()}</strong>
+        </div>
+        <div class="meta-item">
+          <span>Cached</span>
+          <strong>${data.cached ? 'Ja' : 'Nee'}</strong>
+        </div>
+      `;
+
+      const vacanciesEl = document.getElementById('vacancies');
+
+      if (!data.platforms || data.platforms.length === 0) {
+        vacanciesEl.innerHTML = `
+          <div class="no-vacancies">
+            <p>Geen reviews gevonden voor "${escapeHtml(data.businessName)}".</p>
+          </div>
+        `;
+      } else {
+        vacanciesEl.innerHTML = data.platforms.map(platform => {
+          const platformColors = {
+            google: '#4285F4', trustpilot: '#00B67A', yelp: '#D32323',
+            facebook: '#1877F2', tripadvisor: '#34E0A1'
+          };
+          const platformColor = platformColors[(platform.name || '').toLowerCase()] || '#64748b';
+
+          const reviewsHtml = platform.reviews && platform.reviews.length > 0
+            ? platform.reviews.map(review => `
+              <div style="background: #1e293b; border-radius: 6px; padding: 0.75rem; margin-top: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                  <strong style="color: #e2e8f0; font-size: 0.875rem;">${escapeHtml(review.author || 'Anoniem')}</strong>
+                  <span style="color: #fbbf24; font-size: 0.875rem;">${review.rating ? renderStars(review.rating) : ''}</span>
+                </div>
+                ${review.date ? `<span style="color: #64748b; font-size: 0.75rem;">${new Date(review.date).toLocaleDateString('nl-NL')}</span>` : ''}
+                ${review.text ? `<p style="color: #94a3b8; font-size: 0.875rem; margin-top: 0.5rem; line-height: 1.5;">${escapeHtml(review.text)}</p>` : ''}
+              </div>
+            `).join('')
+            : '';
+
+          return `
+            <div class="vacancy" style="border-left-color: ${platformColor};">
+              <h3>
+                <span class="skill" style="background: ${platformColor}; color: white;">${escapeHtml(platform.name || 'Onbekend')}</span>
+                ${platform.averageRating ? `<span style="color: #fbbf24; margin-left: 0.5rem;">${renderStars(platform.averageRating)} ${platform.averageRating.toFixed(1)}</span>` : ''}
+              </h3>
+              <div class="vacancy-meta">
+                ${platform.totalReviews !== undefined ? `<span>📝 ${platform.totalReviews.toLocaleString()} reviews</span>` : ''}
+                ${platform.url ? `<span>🔗 <a href="${escapeHtml(platform.url)}" target="_blank" style="color: #60a5fa;">${escapeHtml(platform.url)}</a></span>` : ''}
+              </div>
+              ${reviewsHtml}
+            </div>
+          `;
+        }).join('');
+      }
+
+      // JSON output
+      document.getElementById('jsonPre').textContent = JSON.stringify(data, null, 2);
+
+      // Curl output
+      const domain = document.getElementById('crDomain').value.trim();
+      document.getElementById('curlPre').textContent = generateReviewsCurl(data.businessName, domain, lastApiKey);
+    }
+
+    // Init Reviews curl preview
+    updateReviewsCurl();
   </script>
 </body>
 </html>
