@@ -3,7 +3,19 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class ExpediaParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 30000);
+    // Stap 1: Haal zoekresultaten op
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+
+    // Stap 2: Zoek de eerste hotel detail URL in de zoekresultaten
+    const detailUrl = this.extractDetailUrl(searchHtml);
+    if (!detailUrl) {
+      return { reviews: [] };
+    }
+
+    // Stap 3: Haal de detail pagina op
+    const { html } = await this.scraper.fetchWithPlaywright(detailUrl, 30000);
+
+    // Stap 4: Extraheer reviews van de detail pagina
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -13,6 +25,58 @@ export class ExpediaParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste hotel detail URL uit Expedia zoekresultaten.
+   * Zoekt naar property-card elementen met links naar /Hotel-Info/ of h= parameter.
+   */
+  extractDetailUrl(html: string): string | undefined {
+    // Zoek links in data-stid="property-card" blokken
+    const propertyCardRegex = /data-stid=["']property-card["'][^>]*>([\s\S]*?)(?=data-stid=["']property-card["']|$)/gi;
+    let cardMatch: RegExpExecArray | null;
+
+    while ((cardMatch = propertyCardRegex.exec(html)) !== null) {
+      const linkUrl = this.extractLinkFromBlock(cardMatch[1]);
+      if (linkUrl) return linkUrl;
+    }
+
+    // Fallback: zoek direct naar hotel detail links in de hele pagina
+    const hotelInfoRegex = /href=["']([^"']*\/Hotel-Info[^"']*)/i;
+    const hotelInfoMatch = html.match(hotelInfoRegex);
+    if (hotelInfoMatch) {
+      return this.resolveUrl(hotelInfoMatch[1]);
+    }
+
+    // Fallback: zoek naar links met h= parameter (Expedia hotel ID)
+    const hParamRegex = /href=["']([^"']*[?&]h=\d+[^"']*)/i;
+    const hParamMatch = html.match(hParamRegex);
+    if (hParamMatch) {
+      return this.resolveUrl(hParamMatch[1]);
+    }
+
+    return undefined;
+  }
+
+  private extractLinkFromBlock(block: string): string | undefined {
+    // Zoek hotel detail links binnen een blok
+    const hotelInfoMatch = block.match(/href=["']([^"']*\/Hotel-Info[^"']*)/i);
+    if (hotelInfoMatch) {
+      return this.resolveUrl(hotelInfoMatch[1]);
+    }
+
+    const hParamMatch = block.match(/href=["']([^"']*[?&]h=\d+[^"']*)/i);
+    if (hParamMatch) {
+      return this.resolveUrl(hParamMatch[1]);
+    }
+
+    return undefined;
+  }
+
+  private resolveUrl(url: string): string {
+    const decoded = this.decodeHtmlEntities(url);
+    if (decoded.startsWith('http')) return decoded;
+    return `https://www.expedia.com${decoded.startsWith('/') ? '' : '/'}${decoded}`;
   }
 
   /**

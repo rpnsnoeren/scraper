@@ -8,6 +8,53 @@ function createParser(): TreatwellParser {
 }
 
 describe('TreatwellParser', () => {
+  describe('extractDetailUrl', () => {
+    it('extraheert relatieve salon-URL uit zoekresultaten', () => {
+      const parser = createParser() as any;
+      const html = '<a href="/salon/kapper-amsterdam-123/">Salon Amsterdam</a>';
+      expect(parser.extractDetailUrl(html)).toBe('https://www.treatwell.nl/salon/kapper-amsterdam-123/');
+    });
+
+    it('extraheert absolute salon-URL uit zoekresultaten', () => {
+      const parser = createParser() as any;
+      const html = '<a href="https://www.treatwell.nl/salon/kapper-amsterdam-456/">Salon</a>';
+      expect(parser.extractDetailUrl(html)).toBe('https://www.treatwell.nl/salon/kapper-amsterdam-456/');
+    });
+
+    it('geeft null bij geen salon-links', () => {
+      const parser = createParser() as any;
+      expect(parser.extractDetailUrl('<div>Geen resultaten</div>')).toBeNull();
+    });
+  });
+
+  describe('parse (twee-staps flow)', () => {
+    it('haalt zoekresultaten op, vindt detail-URL en parset reviews', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const searchHtml = '<a href="/salon/test-salon-1/">Test Salon</a>';
+      const detailHtml = '<span class="rating-value">4.5</span><div class="review-card"><span class="review-text">Geweldig!</span></div>';
+      mockFetch
+        .mockResolvedValueOnce({ html: searchHtml, status: 200 })
+        .mockResolvedValueOnce({ html: detailHtml, status: 200 });
+
+      const result = await parser.parse('https://www.treatwell.nl/places/?q=test');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledWith('https://www.treatwell.nl/salon/test-salon-1/', 30000);
+      expect(result.averageRating).toBe(4.5);
+      expect(result.reviews).toHaveLength(1);
+    });
+
+    it('geeft lege reviews als er geen salon-link gevonden wordt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      mockFetch.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+
+      const result = await parser.parse('https://www.treatwell.nl/places/?q=test');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toEqual([]);
+    });
+  });
+
   describe('extractAverageRating', () => {
     it('extraheert rating uit rating-value class', () => {
       const parser = createParser() as any;

@@ -2,14 +2,98 @@ import { describe, it, expect, vi } from 'vitest';
 import { YelpParser } from '../../review-parsers/yelp';
 import { ScraperService } from '../../scraper';
 
-function createParser(): YelpParser {
+function createParser(fetchMock?: ReturnType<typeof vi.fn>): YelpParser {
   const mockScraper = {
-    fetchWithPlaywright: vi.fn(),
+    fetchWithPlaywright: fetchMock ?? vi.fn(),
   } as unknown as ScraperService;
   return new YelpParser(mockScraper);
 }
 
 describe('YelpParser', () => {
+  describe('extractDetailUrl', () => {
+    it('vindt eerste /biz/ link', () => {
+      const parser = createParser() as any;
+      const html = `
+        <a href="/biz/treatwell-amsterdam">Treatwell Amsterdam</a>
+        <a href="/biz/other-business">Other</a>
+      `;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.yelp.com/biz/treatwell-amsterdam');
+    });
+
+    it('laat absolute URLs intact', () => {
+      const parser = createParser() as any;
+      const html = `<a href="https://www.yelp.com/biz/test-business">Test</a>`;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.yelp.com/biz/test-business');
+    });
+
+    it('skipt /biz_photos/ links', () => {
+      const parser = createParser() as any;
+      const html = `
+        <a href="/biz_photos/test-business">Photos</a>
+        <a href="/biz/test-business">Business</a>
+      `;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.yelp.com/biz/test-business');
+    });
+
+    it('skipt /biz_redir links', () => {
+      const parser = createParser() as any;
+      const html = `
+        <a href="/biz_redir?url=http://example.com">Redirect</a>
+        <a href="/biz/real-business">Real</a>
+      `;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.yelp.com/biz/real-business');
+    });
+
+    it('geeft undefined bij geen /biz/ links', () => {
+      const parser = createParser() as any;
+      expect(parser.extractDetailUrl('<div>Geen resultaten</div>')).toBeUndefined();
+    });
+  });
+
+  describe('parse (two-step flow)', () => {
+    it('haalt zoekresultaten op en navigeert naar business pagina', async () => {
+      const searchHtml = `<a href="/biz/test-cafe-amsterdam">Test Cafe</a>`;
+      const detailHtml = `
+        <div aria-label="4.5 star rating"></div>
+        <span>250 reviews</span>
+        <div class="review__container">
+          <div aria-label="5 star"></div>
+          <div class="comment"><p>Heerlijk!</p></div>
+          <div class="user-passport-info"><a href="/user/1">Lisa</a></div>
+          <span>01/10/2026</span>
+        </div>
+      `;
+
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ html: searchHtml, status: 200 })
+        .mockResolvedValueOnce({ html: detailHtml, status: 200 });
+
+      const parser = createParser(fetchMock);
+      const result = await parser.parse('https://www.yelp.com/search?find_desc=Test');
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledWith('https://www.yelp.com/search?find_desc=Test', 30000);
+      expect(fetchMock).toHaveBeenCalledWith('https://www.yelp.com/biz/test-cafe-amsterdam', 30000);
+      expect(result.averageRating).toBe(4.5);
+      expect(result.totalReviews).toBe(250);
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].text).toBe('Heerlijk!');
+    });
+
+    it('geeft lege reviews bij geen zoekresultaten', async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+
+      const parser = createParser(fetchMock);
+      const result = await parser.parse('https://www.yelp.com/search?find_desc=Test');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toEqual([]);
+      expect(result.averageRating).toBeUndefined();
+      expect(result.totalReviews).toBeUndefined();
+    });
+  });
+
   describe('extractAverageRating', () => {
     it('haalt rating op uit aria-label="X star rating"', () => {
       const parser = createParser() as any;

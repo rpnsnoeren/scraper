@@ -2,14 +2,96 @@ import { describe, it, expect, vi } from 'vitest';
 import { ExpediaParser } from '../../review-parsers/expedia';
 import { ScraperService } from '../../scraper';
 
-function createParser(): ExpediaParser {
+function createParser(fetchMock?: ReturnType<typeof vi.fn>): ExpediaParser {
   const mockScraper = {
-    fetchWithPlaywright: vi.fn(),
+    fetchWithPlaywright: fetchMock ?? vi.fn(),
   } as unknown as ScraperService;
   return new ExpediaParser(mockScraper);
 }
 
 describe('ExpediaParser', () => {
+  describe('extractDetailUrl', () => {
+    it('vindt URL in property-card met /Hotel-Info/ link', () => {
+      const parser = createParser() as any;
+      const html = `
+        <div data-stid="property-card">
+          <a href="/Hotel-Info/amsterdam-hotel.h12345">Amsterdam Hotel</a>
+        </div>
+      `;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.expedia.com/Hotel-Info/amsterdam-hotel.h12345');
+    });
+
+    it('vindt URL met h= parameter', () => {
+      const parser = createParser() as any;
+      const html = `
+        <div data-stid="property-card">
+          <a href="/hotels?h=12345&destination=amsterdam">Hotel</a>
+        </div>
+      `;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.expedia.com/hotels?h=12345&destination=amsterdam');
+    });
+
+    it('vindt fallback /Hotel-Info/ link buiten property-card', () => {
+      const parser = createParser() as any;
+      const html = `<a href="/Hotel-Info/test-hotel.h999">Test Hotel</a>`;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.expedia.com/Hotel-Info/test-hotel.h999');
+    });
+
+    it('laat absolute URLs intact', () => {
+      const parser = createParser() as any;
+      const html = `<a href="https://www.expedia.com/Hotel-Info/test.h1">Test</a>`;
+      expect(parser.extractDetailUrl(html)).toBe('https://www.expedia.com/Hotel-Info/test.h1');
+    });
+
+    it('geeft undefined bij geen resultaten', () => {
+      const parser = createParser() as any;
+      expect(parser.extractDetailUrl('<div>Geen hotels gevonden</div>')).toBeUndefined();
+    });
+  });
+
+  describe('parse (two-step flow)', () => {
+    it('haalt zoekresultaten op en navigeert naar detail pagina', async () => {
+      const searchHtml = `<div data-stid="property-card"><a href="/Hotel-Info/test.h1">Hotel</a></div>`;
+      const detailHtml = `
+        <div>8.4/10 based on 500 verified reviews</div>
+        <div itemprop="review">
+          <span itemprop="ratingValue" content="4.5"></span>
+          <span itemprop="description">Geweldig hotel!</span>
+          <span itemprop="author">Jan</span>
+          <meta itemprop="datePublished" content="2025-12-01">
+        </div>
+      `;
+
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ html: searchHtml, status: 200 })
+        .mockResolvedValueOnce({ html: detailHtml, status: 200 });
+
+      const parser = createParser(fetchMock);
+      const result = await parser.parse('https://www.expedia.com/Hotel-Search?destination=Test');
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledWith('https://www.expedia.com/Hotel-Search?destination=Test', 30000);
+      expect(fetchMock).toHaveBeenCalledWith('https://www.expedia.com/Hotel-Info/test.h1', 30000);
+      expect(result.averageRating).toBe(4.2);
+      expect(result.totalReviews).toBe(500);
+      expect(result.reviews).toHaveLength(1);
+      expect(result.reviews[0].text).toBe('Geweldig hotel!');
+    });
+
+    it('geeft lege reviews bij geen zoekresultaten', async () => {
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+
+      const parser = createParser(fetchMock);
+      const result = await parser.parse('https://www.expedia.com/Hotel-Search?destination=Test');
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toEqual([]);
+      expect(result.averageRating).toBeUndefined();
+      expect(result.totalReviews).toBeUndefined();
+    });
+  });
+
   describe('extractAverageRating', () => {
     it('haalt rating op uit X/5 formaat', () => {
       const parser = createParser() as any;

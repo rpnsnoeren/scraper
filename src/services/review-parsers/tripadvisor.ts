@@ -3,7 +3,22 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class TripadvisorParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 30000);
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+
+    // Stap 1: Zoek de detail-pagina URL uit de zoekresultaten
+    const detailUrl = this.extractDetailUrl(searchHtml);
+
+    // Stap 2: Als een detail URL gevonden is, haal die pagina op
+    let html: string;
+    if (detailUrl) {
+      const { html: detailHtml } = await this.scraper.fetchWithPlaywright(detailUrl, 30000);
+      html = detailHtml;
+    } else {
+      // Geen detail URL gevonden — mogelijk al op een detail-pagina
+      // of geen zoekresultaten. Probeer de huidige HTML.
+      html = searchHtml;
+    }
+
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -13,6 +28,22 @@ export class TripadvisorParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste detail-pagina URL uit Tripadvisor zoekresultaten.
+   * Zoekt naar links met /Restaurant_Review, /Hotel_Review, /Attraction_Review of /ShowUserReviews.
+   */
+  extractDetailUrl(html: string): string | undefined {
+    const detailPattern = /href="((?:https:\/\/www\.tripadvisor\.com)?\/(?:Restaurant_Review|Hotel_Review|Attraction_Review|ShowUserReviews)[^"]+)"/;
+    const match = html.match(detailPattern);
+    if (!match) return undefined;
+
+    const url = this.decodeHtmlEntities(match[1]);
+    if (url.startsWith('/')) {
+      return `https://www.tripadvisor.com${url}`;
+    }
+    return url;
   }
 
   private extractAverageRating(html: string): number | undefined {

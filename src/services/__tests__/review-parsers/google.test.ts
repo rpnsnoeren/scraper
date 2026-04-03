@@ -10,6 +10,92 @@ function createParser(): GoogleReviewsParser {
 }
 
 describe('GoogleReviewsParser', () => {
+  describe('extractPlaceUrl', () => {
+    it('extraheert absolute place URL uit href', () => {
+      const parser = createParser() as any;
+      const html = '<a href="https://www.google.com/maps/place/Treatwell/data=!1234">Treatwell</a>';
+      expect(parser.extractPlaceUrl(html)).toBe('https://www.google.com/maps/place/Treatwell/data=!1234');
+    });
+
+    it('extraheert place URL uit data attributen of JS', () => {
+      const parser = createParser() as any;
+      const html = 'window.url = "https://www.google.nl/maps/place/Treatwell+Amsterdam/@52.37,4.89"';
+      expect(parser.extractPlaceUrl(html)).toBe('https://www.google.nl/maps/place/Treatwell+Amsterdam/@52.37,4.89');
+    });
+
+    it('extraheert relatieve place URL en maakt deze absoluut', () => {
+      const parser = createParser() as any;
+      const html = '<a href="/maps/place/Treatwell/data=!5678">link</a>';
+      expect(parser.extractPlaceUrl(html)).toBe('https://www.google.com/maps/place/Treatwell/data=!5678');
+    });
+
+    it('geeft undefined bij geen place URL', () => {
+      const parser = createParser() as any;
+      expect(parser.extractPlaceUrl('<div>Geen resultaten</div>')).toBeUndefined();
+    });
+  });
+
+  describe('parse - zoek naar detail navigatie', () => {
+    it('haalt detail-pagina op als place URL gevonden wordt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+
+      // Eerste call: zoekresultaten met place link
+      mockFetch.mockResolvedValueOnce({
+        html: '<a href="https://www.google.com/maps/place/Treatwell/data=!123">Treatwell</a>',
+        status: 200,
+      });
+      // Tweede call: detail-pagina met reviews
+      mockFetch.mockResolvedValueOnce({
+        html: `
+          <span aria-label="4,5 sterren"></span>
+          <span>100 reviews</span>
+          <div data-review-id="r1">
+            <span aria-label="5 sterren"></span>
+            <span class="review-full-text">Top!</span>
+          </div>
+        `,
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledWith('https://www.google.com/maps/place/Treatwell/data=!123', 20000);
+      expect(result.averageRating).toBe(4.5);
+      expect(result.reviews).toHaveLength(1);
+    });
+
+    it('gebruikt zoekresultaat-HTML als geen place URL gevonden wordt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+
+      // Enkel zoekpagina zonder place links maar met review data (direct redirect)
+      mockFetch.mockResolvedValueOnce({
+        html: `
+          <span aria-label="4,0 sterren"></span>
+          <span>50 reviews</span>
+        `,
+        status: 200,
+      });
+
+      const result = await parser.parse('https://www.google.com/maps/search/Treatwell');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.averageRating).toBe(4.0);
+    });
+
+    it('geeft leeg resultaat als er geen reviews zijn', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+
+      mockFetch.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+
+      const result = await parser.parse('https://www.google.com/maps/search/Onbekend');
+      expect(result.reviews).toHaveLength(0);
+      expect(result.averageRating).toBeUndefined();
+      expect(result.totalReviews).toBeUndefined();
+    });
+  });
+
   describe('extractAverageRating', () => {
     it('extraheert rating uit aria-label met sterren (NL)', () => {
       const parser = createParser() as any;

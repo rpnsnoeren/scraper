@@ -3,7 +3,21 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class GoogleReviewsParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 20000);
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 20000);
+
+    // Stap 1: Zoek de detail-pagina URL uit de zoekresultaten
+    const placeUrl = this.extractPlaceUrl(searchHtml);
+
+    // Stap 2: Als een place URL gevonden is, haal die pagina op
+    let html: string;
+    if (placeUrl) {
+      const { html: detailHtml } = await this.scraper.fetchWithPlaywright(placeUrl, 20000);
+      html = detailHtml;
+    } else {
+      // Geen place URL gevonden — Google heeft mogelijk direct doorgestuurd
+      // naar een place pagina (bij exact één resultaat). Gebruik de huidige HTML.
+      html = searchHtml;
+    }
 
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
@@ -14,6 +28,31 @@ export class GoogleReviewsParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste /maps/place/ URL uit Google Maps zoekresultaten.
+   */
+  extractPlaceUrl(html: string): string | undefined {
+    // Zoek naar href links met /maps/place/
+    const hrefMatch = html.match(/href="(https:\/\/www\.google\.[a-z.]+\/maps\/place\/[^"]+)"/);
+    if (hrefMatch) {
+      return hrefMatch[1];
+    }
+
+    // Zoek naar /maps/place/ in data attributen of JavaScript
+    const placeMatch = html.match(/(https:\/\/www\.google\.[a-z.]+\/maps\/place\/[^"'\s\\]+)/);
+    if (placeMatch) {
+      return placeMatch[1];
+    }
+
+    // Relatieve URL
+    const relativeMatch = html.match(/href="(\/maps\/place\/[^"]+)"/);
+    if (relativeMatch) {
+      return `https://www.google.com${relativeMatch[1]}`;
+    }
+
+    return undefined;
   }
 
   /**

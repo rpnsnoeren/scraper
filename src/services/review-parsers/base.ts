@@ -84,6 +84,18 @@ export abstract class ReviewParserBase {
     return undefined;
   }
 
+  /**
+   * Decodeert HTML entities (&amp; &quot; etc.) in een URL.
+   */
+  protected decodeHtmlEntities(url: string): string {
+    return url
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>');
+  }
+
   private parseNumber(numStr: string): number | undefined {
     // Bepaal of punt of komma de duizendtal-scheider is
     // "1.234" (NL) = 1234, "1,234" (EN) = 1234

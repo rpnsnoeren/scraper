@@ -8,6 +8,53 @@ function createParser(): BookingParser {
 }
 
 describe('BookingParser', () => {
+  describe('extractDetailUrl', () => {
+    it('extraheert relatieve hotel-URL uit zoekresultaten', () => {
+      const parser = createParser() as any;
+      const html = '<a href="/hotel/nl/some-hotel.html">Hotel Amsterdam</a>';
+      expect(parser.extractDetailUrl(html)).toBe('https://www.booking.com/hotel/nl/some-hotel.html');
+    });
+
+    it('extraheert absolute hotel-URL uit zoekresultaten', () => {
+      const parser = createParser() as any;
+      const html = '<a href="https://www.booking.com/hotel/nl/other-hotel.html">Hotel</a>';
+      expect(parser.extractDetailUrl(html)).toBe('https://www.booking.com/hotel/nl/other-hotel.html');
+    });
+
+    it('geeft null bij geen hotel-links', () => {
+      const parser = createParser() as any;
+      expect(parser.extractDetailUrl('<div>Geen resultaten</div>')).toBeNull();
+    });
+  });
+
+  describe('parse (twee-staps flow)', () => {
+    it('haalt zoekresultaten op, vindt detail-URL en parset reviews', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      const searchHtml = '<a href="/hotel/nl/test-hotel.html">Test Hotel</a>';
+      const detailHtml = 'Scored 8.0 <div data-testid="review-card"><span class="review-pos">Fijn</span></div>';
+      mockFetch
+        .mockResolvedValueOnce({ html: searchHtml, status: 200 })
+        .mockResolvedValueOnce({ html: detailHtml, status: 200 });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledWith('https://www.booking.com/hotel/nl/test-hotel.html#tab-reviews', 30000);
+      expect(result.averageRating).toBe(4.0);
+      expect(result.reviews).toHaveLength(1);
+    });
+
+    it('geeft lege reviews als er geen hotel-link gevonden wordt', async () => {
+      const parser = createParser();
+      const mockFetch = (parser as any).scraper.fetchWithPlaywright;
+      mockFetch.mockResolvedValueOnce({ html: '<div>Geen resultaten</div>', status: 200 });
+
+      const result = await parser.parse('https://www.booking.com/searchresults.html?ss=test');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(result.reviews).toEqual([]);
+    });
+  });
+
   describe('extractAverageRating (10→5 conversie)', () => {
     it('converteert "Scored 8.5" naar 4.3 (8.5/2)', () => {
       const parser = createParser() as any;

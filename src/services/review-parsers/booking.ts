@@ -3,7 +3,19 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class BookingParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 30000);
+    // Stap 1: Haal zoekresultaten op
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+
+    // Stap 2: Zoek de eerste hotel detail-URL in de zoekresultaten
+    const detailUrl = this.extractDetailUrl(searchHtml);
+    if (!detailUrl) {
+      return { reviews: [] };
+    }
+
+    // Stap 3: Haal de hotel detailpagina op (met #tab-reviews voor reviews sectie)
+    const reviewUrl = detailUrl.includes('#') ? detailUrl : `${detailUrl}#tab-reviews`;
+    const { html } = await this.scraper.fetchWithPlaywright(reviewUrl, 30000);
+
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -13,6 +25,26 @@ export class BookingParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste hotel detail-URL uit zoekresultaten.
+   * Zoekt naar links met /hotel/ in het href-attribuut.
+   */
+  extractDetailUrl(html: string): string | null {
+    // Absolute URL (meest voorkomend op Booking.com, bevat vaak &amp; entities)
+    const absoluteMatch = html.match(/href="(https?:\/\/www\.booking\.com\/hotel\/[^"]+)"/);
+    if (absoluteMatch) {
+      return this.decodeHtmlEntities(absoluteMatch[1]);
+    }
+
+    // Relatieve URL
+    const match = html.match(/href="(\/hotel\/[^"]+)"/);
+    if (match) {
+      return `https://www.booking.com${this.decodeHtmlEntities(match[1])}`;
+    }
+
+    return null;
   }
 
   /**

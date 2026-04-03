@@ -3,7 +3,19 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class YelpParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 30000);
+    // Stap 1: Haal zoekresultaten op
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+
+    // Stap 2: Zoek de eerste business detail URL in de zoekresultaten
+    const detailUrl = this.extractDetailUrl(searchHtml);
+    if (!detailUrl) {
+      return { reviews: [] };
+    }
+
+    // Stap 3: Haal de business detail pagina op
+    const { html } = await this.scraper.fetchWithPlaywright(detailUrl, 30000);
+
+    // Stap 4: Extraheer reviews van de detail pagina
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -13,6 +25,30 @@ export class YelpParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste business detail URL uit Yelp zoekresultaten.
+   * Zoekt naar links met /biz/ in het href attribuut.
+   */
+  extractDetailUrl(html: string): string | undefined {
+    const bizLinkRegex = /href=["']([^"']*\/biz\/[^"']+)["']/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = bizLinkRegex.exec(html)) !== null) {
+      const href = match[1];
+      // Skip advertentie-links en adrenaline/non-business links
+      if (href.includes('/biz_photos/') || href.includes('/biz_redir')) continue;
+      return this.resolveUrl(href);
+    }
+
+    return undefined;
+  }
+
+  private resolveUrl(url: string): string {
+    const decoded = this.decodeHtmlEntities(url);
+    if (decoded.startsWith('http')) return decoded;
+    return `https://www.yelp.com${decoded.startsWith('/') ? '' : '/'}${decoded}`;
   }
 
   /**

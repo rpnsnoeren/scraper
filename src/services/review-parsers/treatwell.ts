@@ -3,7 +3,18 @@ import { ReviewParserBase, ParsedReviews } from './base';
 
 export class TreatwellParser extends ReviewParserBase {
   async parse(url: string): Promise<ParsedReviews> {
-    const { html } = await this.scraper.fetchWithPlaywright(url, 30000);
+    // Stap 1: Haal zoekresultaten op
+    const { html: searchHtml } = await this.scraper.fetchWithPlaywright(url, 30000);
+
+    // Stap 2: Zoek de eerste salon detail-URL in de zoekresultaten
+    const detailUrl = this.extractDetailUrl(searchHtml);
+    if (!detailUrl) {
+      return { reviews: [] };
+    }
+
+    // Stap 3: Haal de salon detailpagina op
+    const { html } = await this.scraper.fetchWithPlaywright(detailUrl, 30000);
+
     const averageRating = this.extractAverageRating(html);
     const totalReviews = this.extractTotalReviews(html);
     const reviews = this.extractReviews(html);
@@ -13,6 +24,26 @@ export class TreatwellParser extends ReviewParserBase {
       totalReviews,
       reviews: this.selectRandom(reviews),
     };
+  }
+
+  /**
+   * Extraheert de eerste salon detail-URL uit zoekresultaten.
+   * Zoekt naar links met /salon/ in het href-attribuut.
+   */
+  extractDetailUrl(html: string): string | null {
+    // Absolute URL
+    const absoluteMatch = html.match(/href="(https?:\/\/www\.treatwell\.nl\/salon\/[^"]+)"/);
+    if (absoluteMatch) {
+      return this.decodeHtmlEntities(absoluteMatch[1]);
+    }
+
+    // Relatieve URL
+    const match = html.match(/href="(\/salon\/[^"]+)"/);
+    if (match) {
+      return `https://www.treatwell.nl${this.decodeHtmlEntities(match[1])}`;
+    }
+
+    return null;
   }
 
   private extractAverageRating(html: string): number | undefined {
