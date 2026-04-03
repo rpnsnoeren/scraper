@@ -80,66 +80,65 @@ export class ChatSyncOrchestrator {
 
     console.log(`[ChatSync] Scraping ${targetUrls.length} pages (filtered from ${urls.length})...`);
 
-    // Scrape each page with rate limiting
+    // Eerst een snelle HTTP check op de homepage om te bepalen of deze site
+    // Playwright nodig heeft (sommige sites geven 404 op subpagina's via HTTP)
+    let siteNeedsPlaywright = false;
+    try {
+      const testUrl = targetUrls.find(u => u !== baseUrl) || targetUrls[0];
+      const testResult = await this.scraper.fetchWithHttp(testUrl);
+      if (testResult.status >= 400 || this.scraper.needsJavaScript(testResult.html)) {
+        siteNeedsPlaywright = true;
+        console.log(`[ChatSync] Site vereist Playwright (HTTP gaf status ${testResult.status})`);
+      }
+    } catch {
+      siteNeedsPlaywright = true;
+      console.log(`[ChatSync] Site vereist Playwright (HTTP fetch mislukt)`);
+    }
+
+    // Scrape pagina's — parallel in batches van 3 als Playwright nodig is
+    const BATCH_SIZE = siteNeedsPlaywright ? 3 : 5;
     const pages: ChatSyncPage[] = [];
     const seenHashes = new Set<string>();
+    const startTime = Date.now();
 
-    for (let i = 0; i < targetUrls.length; i++) {
-      const url = targetUrls[i];
-      try {
-        console.log(`[ChatSync] [${i + 1}/${targetUrls.length}] ${url}`);
-        let html: string;
-        let status: number;
-        let needsPlaywright = false;
+    for (let i = 0; i < targetUrls.length; i += BATCH_SIZE) {
+      const batch = targetUrls.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(targetUrls.length / BATCH_SIZE);
+      console.log(`[ChatSync] Batch ${batchNum}/${totalBatches} (${batch.length} pagina's, ${Math.round((Date.now() - startTime) / 1000)}s verstreken)`);
 
-        try {
-          const result = await this.scraper.fetchWithHttp(url);
-          html = result.html;
-          status = result.status;
-          if (status >= 400) needsPlaywright = true;
-          else if (this.scraper.needsJavaScript(html)) needsPlaywright = true;
-        } catch {
-          needsPlaywright = true;
-          html = '';
-          status = 0;
-        }
+      const results = await Promise.allSettled(
+        batch.map(url => this.fetchPage(url, siteNeedsPlaywright))
+      );
 
-        if (needsPlaywright) {
-          console.log(`[ChatSync]   Fallback naar Playwright...`);
-          const result = await this.scraper.fetchWithPlaywright(url);
-          html = result.html;
-          status = result.status;
-          if (status >= 400) {
-            console.log(`[ChatSync]   Skipped (HTTP ${status})`);
-            continue;
-          }
-        }
+      for (const result of results) {
+        if (result.status !== 'fulfilled' || !result.value) continue;
+        const { html, url } = result.value;
 
         const page = this.extractPage(html, url);
 
-        // Skip empty/very short pages
         if (page.content.length < 50) {
-          console.log(`[ChatSync]   Skipped (too short)`);
+          console.log(`[ChatSync]   Skipped (too short): ${url}`);
           continue;
         }
 
-        // Deduplicate on content hash
         if (seenHashes.has(page.content_hash)) {
-          console.log(`[ChatSync]   Skipped (duplicate content)`);
+          console.log(`[ChatSync]   Skipped (duplicate): ${url}`);
           continue;
         }
 
         seenHashes.add(page.content_hash);
         pages.push(page);
+      }
 
-        // Rate limit: 1 request per second
-        if (i < targetUrls.length - 1) {
-          await this.delay(1000);
-        }
-      } catch (err) {
-        console.error(`[ChatSync]   Failed: ${err}`);
+      // Rate limit tussen batches
+      if (i + BATCH_SIZE < targetUrls.length) {
+        await this.delay(500);
       }
     }
+
+    const elapsed = Math.round((Date.now() - startTime) / 1000);
+    console.log(`[ChatSync] Klaar: ${pages.length} pagina's in ${elapsed}s`);
 
     const response: ChatSyncResponse = {
       domain,
@@ -151,6 +150,30 @@ export class ChatSyncOrchestrator {
 
     await this.cache.set(cacheKey, response);
     return response;
+  }
+
+  private async fetchPage(
+    url: string,
+    usePlaywright: boolean,
+  ): Promise<{ html: string; url: string } | null> {
+    try {
+      if (!usePlaywright) {
+        const result = await this.scraper.fetchWithHttp(url);
+        if (result.status < 400 && !this.scraper.needsJavaScript(result.html)) {
+          return { html: result.html, url };
+        }
+      }
+      // Playwright met kortere timeout (20s i.p.v. default 45s)
+      const result = await this.scraper.fetchWithPlaywright(url, 20000);
+      if (result.status >= 400) {
+        console.log(`[ChatSync]   HTTP ${result.status}: ${url}`);
+        return null;
+      }
+      return { html: result.html, url };
+    } catch (err) {
+      console.error(`[ChatSync]   Failed: ${url} — ${err}`);
+      return null;
+    }
   }
 
   private extractPage(html: string, url: string): ChatSyncPage {
@@ -221,7 +244,14 @@ export class ChatSyncOrchestrator {
     // Filter out unwanted URLs
     const filtered = urls.filter(url => {
       try {
-        const path = new URL(url).pathname;
+        // Skip mailto:, tel:, javascript: links
+        if (/^(mailto:|tel:|javascript:|#)/i.test(url)) return false;
+        const parsed = new URL(url);
+        // Skip non-http protocols
+        if (!parsed.protocol.startsWith('http')) return false;
+        // Skip file downloads
+        if (/\.(pdf|zip|doc|xls|png|jpg|gif|svg)$/i.test(parsed.pathname)) return false;
+        const path = parsed.pathname;
         return !SKIP_PATTERNS.some(pattern => pattern.test(path));
       } catch {
         return false;
